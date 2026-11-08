@@ -18,6 +18,13 @@ const REVIEW_LABELS: Record<ReviewStatus, string> = {
   stranger: "Чужий (оператор)",
 };
 
+export function eventTitle(event: EventRecord, names: Map<string, string>): string {
+  if (event.type === "known_person" && event.person_id) {
+    return `Свій: ${names.get(event.person_id) ?? "—"}`;
+  }
+  return EVENT_LABELS[event.type].text;
+}
+
 export function reviewLabel(event: EventRecord, names: Map<string, string>): string | null {
   if (!event.review_status) return null;
   if (event.review_status === "known" && event.person_id) {

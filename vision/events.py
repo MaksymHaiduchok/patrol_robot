@@ -6,14 +6,17 @@ from typing import Literal
 
 import httpx
 
-from detector import PersonBox
+from detector import Detection
 
 logger = logging.getLogger("vision.events")
 
 EventType = Literal["person_detected", "known_person", "stranger_detected", "person_left"]
 
 LEFT_AFTER_SECONDS = 3.0
+STRANGER_CONFIRM_FRAMES = 5
+KNOWN_GRACE_SECONDS = 3.0
 REQUEST_TIMEOUT_SECONDS = 5.0
+STRANGER_KEY = "stranger"
 
 
 @dataclass(frozen=True)
@@ -21,6 +24,7 @@ class VisionEvent:
     type: EventType
     confidence: float | None
     ts: int
+    person_id: str | None = None
 
 
 class PresenceTracker:
@@ -30,13 +34,27 @@ class PresenceTracker:
         self._visit_open = False
         self._last_seen: float | None = None
         self._last_left: float | None = None
+        self._identity_last_seen: dict[str, float] = {}
+        self._stranger_streak = 0
+        self._last_known_at: float | None = None
 
-    def update(self, boxes: list[PersonBox], now: float) -> VisionEvent | None:
-        if boxes:
+    def update(self, detections: list[Detection], now: float) -> list[VisionEvent]:
+        events: list[VisionEvent] = []
+        presence = self._update_presence(detections, now)
+        if presence is not None:
+            events.append(presence)
+        events.extend(self._update_known(detections, now))
+        stranger = self._update_stranger(detections, now)
+        if stranger is not None:
+            events.append(stranger)
+        return events
+
+    def _update_presence(self, detections: list[Detection], now: float) -> VisionEvent | None:
+        if detections:
             self._last_seen = now
             if not self._visit_open and self._cooldown_passed(now):
                 self._visit_open = True
-                confidence = max(box.confidence for box in boxes)
+                confidence = max(detection.box.confidence for detection in detections)
                 return VisionEvent("person_detected", round(confidence, 3), _now_ms())
             return None
 
@@ -50,6 +68,51 @@ class PresenceTracker:
             return VisionEvent("person_left", None, _now_ms())
         return None
 
+    def _update_known(self, detections: list[Detection], now: float) -> list[VisionEvent]:
+        events: list[VisionEvent] = []
+        for detection in detections:
+            person_id = detection.face.person_id
+            if person_id is None:
+                continue
+            self._last_known_at = now
+            if self._identity_appeared(person_id, now):
+                events.append(
+                    VisionEvent(
+                        "known_person", round(detection.face.score, 3), _now_ms(), person_id
+                    )
+                )
+        return events
+
+    def _update_stranger(self, detections: list[Detection], now: float) -> VisionEvent | None:
+        strangers = [
+            detection
+            for detection in detections
+            if detection.face.face_found and detection.face.person_id is None
+        ]
+        if not strangers or self._is_known_turning_away(detections, now):
+            self._stranger_streak = 0
+            return None
+
+        self._stranger_streak += 1
+        if self._stranger_streak < STRANGER_CONFIRM_FRAMES:
+            return None
+        if not self._identity_appeared(STRANGER_KEY, now):
+            return None
+        confidence = max(detection.box.confidence for detection in strangers)
+        return VisionEvent("stranger_detected", round(confidence, 3), _now_ms())
+
+    def _is_known_turning_away(self, detections: list[Detection], now: float) -> bool:
+        return (
+            len(detections) == 1
+            and self._last_known_at is not None
+            and now - self._last_known_at < KNOWN_GRACE_SECONDS
+        )
+
+    def _identity_appeared(self, key: str, now: float) -> bool:
+        last_seen = self._identity_last_seen.get(key)
+        self._identity_last_seen[key] = now
+        return last_seen is None or now - last_seen >= self._cooldown
+
     def _cooldown_passed(self, now: float) -> bool:
         return self._last_left is None or now - self._last_left >= self._cooldown
 
@@ -60,7 +123,9 @@ class EventSender:
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="event-sender")
 
     def send(self, event: VisionEvent) -> None:
-        logger.info("event %s confidence=%s", event.type, event.confidence)
+        logger.info(
+            "event %s confidence=%s person_id=%s", event.type, event.confidence, event.person_id
+        )
         self._executor.submit(self._post, event)
 
     def close(self) -> None:
@@ -72,7 +137,12 @@ class EventSender:
         try:
             response = self._client.post(
                 "/events",
-                json={"type": event.type, "confidence": event.confidence, "ts": event.ts},
+                json={
+                    "type": event.type,
+                    "confidence": event.confidence,
+                    "person_id": event.person_id,
+                    "ts": event.ts,
+                },
             )
             response.raise_for_status()
         except httpx.HTTPError as error:

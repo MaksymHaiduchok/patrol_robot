@@ -23,7 +23,9 @@ pnpm start:dev
 - `POST /events` — подія від vision (формат у `docs/protocol.md`)
 - `GET /events?limit=50&offset=0` — журнал подій
 - `PATCH /events/:id/review` — оцінка оператора (свій / свій, дані пізніше / чужий)
-- `GET /persons`, `POST /persons` — «свої»
+- `GET /persons`, `POST /persons`, `DELETE /persons/:id` — «свої»
+- `POST /persons/:id/photos` (multipart `photos`), `POST /persons/:id/capture` — додати обличчя з файлів або з камери
+- `GET /persons/embeddings` — вектори облич для vision
 - WebSocket `ws://localhost:4000/operator` — живі події для веб-інтерфейсу
 
 ## Змінні середовища

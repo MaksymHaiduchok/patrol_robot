@@ -41,8 +41,25 @@ export type PersonRecord = {
   created_at: string;
 };
 
+export type PersonSummary = PersonRecord & {
+  photo_count: number;
+};
+
 export type CreatePersonRequest = {
   name: string;
+};
+
+export type PersonEmbedding = {
+  person_id: string;
+  name: string;
+  embedding: number[];
+};
+
+export type FaceFailureReason = 'no_face' | 'multiple_faces' | 'invalid_image';
+
+export type AddPhotosResult = {
+  added: number;
+  failed: { file: string; reason: FaceFailureReason }[];
 };
 
 export type OperatorServerMessage =

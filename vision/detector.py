@@ -10,6 +10,8 @@ import numpy as np
 import torch
 from ultralytics import YOLO
 
+from faces import NO_FACE, FaceMatch, FaceRecognizer
+
 logger = logging.getLogger("vision.detector")
 
 PERSON_CLASS_ID = 0
@@ -26,7 +28,13 @@ class PersonBox:
     confidence: float
 
 
-DetectionListener = Callable[[list[PersonBox], float], None]
+@dataclass(frozen=True)
+class Detection:
+    box: PersonBox
+    face: FaceMatch
+
+
+DetectionListener = Callable[[list[Detection], float], None]
 
 
 class FrameSource(Protocol):
@@ -40,24 +48,31 @@ def resolve_device(requested: str) -> str:
     return requested
 
 
+def average(values: list[float]) -> float:
+    return round(sum(values) / len(values), 1) if values else 0.0
+
+
 class PersonDetector:
     def __init__(
         self,
         source: FrameSource,
+        recognizer: FaceRecognizer,
         model_path: str,
         device: str,
         confidence: float,
         max_fps: float,
     ) -> None:
         self._source = source
+        self._recognizer = recognizer
         self._model = YOLO(model_path)
         self.device = resolve_device(device)
         self._confidence = confidence
         self._min_interval = 1.0 / max_fps
         self._lock = threading.Lock()
-        self._boxes: list[PersonBox] = []
+        self._detections: list[Detection] = []
         self._listener: DetectionListener | None = None
         self._inference_ms: deque[float] = deque(maxlen=STATS_WINDOW_SIZE)
+        self._face_ms: deque[float] = deque(maxlen=STATS_WINDOW_SIZE)
         self._timestamps: deque[float] = deque(maxlen=STATS_WINDOW_SIZE)
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="person-detector", daemon=True)
@@ -73,19 +88,21 @@ class PersonDetector:
         self._stop.set()
         self._thread.join(timeout=5)
 
-    def boxes(self) -> list[PersonBox]:
+    def detections(self) -> list[Detection]:
         with self._lock:
-            return list(self._boxes)
+            return list(self._detections)
 
     def stats(self) -> dict[str, float]:
         with self._lock:
             inference = list(self._inference_ms)
+            face = list(self._face_ms)
             timestamps = list(self._timestamps)
         elapsed = timestamps[-1] - timestamps[0] if len(timestamps) > 1 else 0.0
         return {
             "detection_fps": round((len(timestamps) - 1) / elapsed, 1) if elapsed > 0 else 0.0,
-            "inference_ms_avg": round(sum(inference) / len(inference), 1) if inference else 0.0,
+            "inference_ms_avg": average(inference),
             "inference_ms_max": round(max(inference), 1) if inference else 0.0,
+            "face_ms_avg": average(face),
         }
 
     def _warm_up(self) -> None:
@@ -112,9 +129,15 @@ class PersonDetector:
             )
         ]
 
+    def _identify(self, frame: np.ndarray, box: PersonBox) -> FaceMatch:
+        crop = np.ascontiguousarray(frame[box.y1 : box.y2, box.x1 : box.x2])
+        if crop.size == 0:
+            return NO_FACE
+        return self._recognizer.identify(crop)
+
     def _run(self) -> None:
         last_frame_id = -1
-        last_count = 0
+        last_summary = ""
         while not self._stop.is_set():
             started = time.monotonic()
             frame_id, frame = self._source.latest_frame()
@@ -127,16 +150,35 @@ class PersonDetector:
             boxes = self._predict(frame)
             inference_ms = (time.perf_counter() - inference_started) * 1000
 
+            face_started = time.perf_counter()
+            detections = [Detection(box, self._identify(frame, box)) for box in boxes]
+            face_ms = (time.perf_counter() - face_started) * 1000
+
             with self._lock:
-                self._boxes = boxes
+                self._detections = detections
                 self._inference_ms.append(inference_ms)
+                if detections:
+                    self._face_ms.append(face_ms)
                 self._timestamps.append(time.monotonic())
 
             if self._listener is not None:
-                self._listener(boxes, time.monotonic())
+                self._listener(detections, time.monotonic())
 
-            if len(boxes) != last_count:
-                logger.info("persons in frame: %d", len(boxes))
-                last_count = len(boxes)
+            summary = describe(detections)
+            if summary != last_summary:
+                logger.info("in frame: %s", summary or "nobody")
+                last_summary = summary
 
             self._stop.wait(max(0.0, self._min_interval - (time.monotonic() - started)))
+
+
+def describe(detections: list[Detection]) -> str:
+    labels = []
+    for detection in detections:
+        if detection.face.name:
+            labels.append(detection.face.name)
+        elif detection.face.face_found:
+            labels.append("stranger")
+        else:
+            labels.append("person")
+    return ", ".join(sorted(labels))

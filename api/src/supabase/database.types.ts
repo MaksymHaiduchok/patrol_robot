@@ -1,5 +1,18 @@
 import type { EventRecord, PersonRecord } from '../protocol/protocol.js';
 
+export type FaceEmbeddingRow = {
+  id: string;
+  person_id: string;
+  embedding: string;
+  photo_path: string | null;
+  created_at: string;
+};
+
+type FaceEmbeddingInsert = Pick<
+  FaceEmbeddingRow,
+  'person_id' | 'embedding' | 'photo_path'
+>;
+
 type EventInsert = Pick<
   EventRecord,
   'type' | 'person_id' | 'confidence' | 'mode'
@@ -32,6 +45,12 @@ export type Database = {
         Row: PersonRecord;
         Insert: PersonInsert;
         Update: Partial<PersonInsert>;
+        Relationships: [];
+      };
+      face_embeddings: {
+        Row: FaceEmbeddingRow;
+        Insert: FaceEmbeddingInsert;
+        Update: Partial<FaceEmbeddingInsert>;
         Relationships: [];
       };
     };

@@ -19,7 +19,7 @@ export function OperatorDashboard() {
   const health = useVisionHealth();
   const online = health?.source_connected ?? false;
   const { events, connected, pendingReview, applyUpdate, dismissReview } = useOperatorEvents();
-  const { names, addPerson } = usePersons();
+  const { names, refresh: refreshPersons } = usePersons();
   const reviewTarget = pendingReview[0];
 
   return (
@@ -43,7 +43,7 @@ export function OperatorDashboard() {
           key={reviewTarget.id}
           event={reviewTarget}
           onReviewed={applyUpdate}
-          onPersonCreated={addPerson}
+          onPersonsChanged={refreshPersons}
           onDismiss={() => dismissReview(reviewTarget.id)}
         />
       )}

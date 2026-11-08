@@ -1,5 +1,5 @@
 import type { EventRecord } from "@/lib/protocol";
-import { EVENT_LABELS, formatTime, reviewLabel } from "@/lib/eventLabels";
+import { EVENT_LABELS, eventTitle, formatTime, reviewLabel } from "@/lib/eventLabels";
 
 type EventsFeedProps = {
   events: EventRecord[];
@@ -22,7 +22,7 @@ function EventItem({ event, names }: { event: EventRecord; names: Map<string, st
       <div className="flex items-center gap-2">
         <span className={`size-2 shrink-0 rounded-full ${label.dotClassName}`} />
         <span className="text-xs text-muted">{formatTime(event.created_at)}</span>
-        <span className="text-sm font-medium">{label.text}</span>
+        <span className="text-sm font-medium">{eventTitle(event, names)}</span>
         {event.confidence !== null && (
           <span className="ml-auto text-xs text-muted">{Math.round(event.confidence * 100)}%</span>
         )}

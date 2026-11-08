@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { fetchEvents } from "@/lib/api";
-import { EVENT_LABELS, formatDateTime, reviewLabel } from "@/lib/eventLabels";
+import { EVENT_LABELS, eventTitle, formatDateTime, reviewLabel } from "@/lib/eventLabels";
 import type { EventsPage, SystemMode } from "@/lib/protocol";
 import { usePersons } from "@/lib/usePersons";
 import { useVisionHealth } from "@/lib/useVisionHealth";
@@ -65,7 +65,7 @@ export function EventsLog() {
                   <td className="px-4 py-3">
                     <span className="flex items-center gap-2">
                       <span className={`size-2 rounded-full ${EVENT_LABELS[event.type].dotClassName}`} />
-                      {EVENT_LABELS[event.type].text}
+                      {eventTitle(event, names)}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-muted">

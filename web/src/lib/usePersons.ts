@@ -1,28 +1,33 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchPersons } from "@/lib/api";
-import type { PersonRecord } from "@/lib/protocol";
+import type { PersonSummary } from "@/lib/protocol";
 
 type Persons = {
+  persons: PersonSummary[];
   names: Map<string, string>;
-  addPerson: (person: PersonRecord) => void;
+  loaded: boolean;
+  refresh: () => void;
 };
 
 export function usePersons(): Persons {
-  const [persons, setPersons] = useState<PersonRecord[]>([]);
+  const [persons, setPersons] = useState<PersonSummary[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     fetchPersons()
       .then(setPersons)
-      .catch(() => setPersons([]));
+      .catch(() => setPersons([]))
+      .finally(() => setLoaded(true));
   }, []);
 
-  const addPerson = useCallback((person: PersonRecord) => {
-    setPersons((current) => [...current, person]);
-  }, []);
+  useEffect(refresh, [refresh]);
 
-  const names = new Map(persons.map((person) => [person.id, person.name]));
+  const names = useMemo(
+    () => new Map(persons.map((person) => [person.id, person.name])),
+    [persons],
+  );
 
-  return { names, addPerson };
+  return { persons, names, loaded, refresh };
 }

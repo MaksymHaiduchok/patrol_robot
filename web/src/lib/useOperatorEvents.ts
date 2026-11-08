@@ -65,7 +65,7 @@ export function useOperatorEvents(): OperatorEvents {
       socket.onmessage = (message: MessageEvent<string>) => {
         const data: OperatorServerMessage = JSON.parse(message.data);
         applyUpdate(data.event);
-        if (data.type === "event_created" && data.event.type === "person_detected") {
+        if (data.type === "event_created" && data.event.type === "stranger_detected") {
           setPendingReview((current) => [...current, data.event]);
         }
       };

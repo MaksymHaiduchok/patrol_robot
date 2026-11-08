@@ -10,6 +10,7 @@ type HeaderProps = {
 const NAV_ITEMS = [
   { href: "/", label: "Панель" },
   { href: "/events", label: "Журнал подій" },
+  { href: "/persons", label: "Свої" },
 ];
 
 export function Header({ online }: HeaderProps) {

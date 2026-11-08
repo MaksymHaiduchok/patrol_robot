@@ -13,6 +13,8 @@ uv run uvicorn main:app --reload --port 8001 --timeout-graceful-shutdown 1
 
 Перевірка: http://localhost:8001/health (стан і FPS), http://localhost:8001/stream (відео з рамками), http://localhost:8001/metrics (FPS детекції, час інференсу YOLO).
 
+Ендпоінти облич (викликає api): `POST /faces/embed` (тіло — байти зображення), `POST /faces/capture` (обличчя з поточного кадру), `POST /faces/reload` (перечитати «своїх» з api). Вектори «своїх» vision бере з `GET {API_URL}/persons/embeddings` при старті.
+
 При першому запуску з камерою Mac macOS спитає дозвіл на камеру для терміналу. Якщо поруч iPhone з Continuity Camera, він може зайняти індекс `0`, а вбудована камера стане `1`.
 
 Форматування і лінтер: `uv run ruff format . && uv run ruff check .`

@@ -16,8 +16,8 @@ vision надсилає подію, коли змінюється ситуаці
 | Поле | Тип | Опис |
 |---|---|---|
 | `type` | `person_detected` \| `known_person` \| `stranger_detected` \| `person_left` | тип події |
-| `confidence` | number \| null | найбільша впевненість детекції серед людей у кадрі; `null` для `person_left` |
-| `person_id` | string \| null | id «свого» (з етапу 5), необов'язкове |
+| `confidence` | number \| null | `person_detected`, `stranger_detected` — найбільша впевненість YOLO серед людей; `known_person` — cosine similarity обличчя; `person_left` — `null` |
+| `person_id` | string \| null | id «свого» для `known_person`, інакше `null` |
 | `ts` | number | час формування події у vision; api за ним рахує затримку vision→api |
 
 Відповідь `201`: збережений запис `EventRecord` (див. нижче). Відповідь `400`: невалідне тіло.
@@ -27,6 +27,8 @@ vision надсилає подію, коли змінюється ситуаці
 - `person_detected` — людина з'явилась у кадрі, і з моменту попереднього `person_left` минуло ≥ `EVENT_COOLDOWN_SECONDS`.
 - `person_left` — у кадрі немає людей ≥ 3 с після `person_detected`.
 - Події завжди йдуть парами: `person_left` надсилається лише після `person_detected`. Повернення людини раніше ніж за cooldown після `person_left` нової події не створює.
+- `known_person` — обличчя збіглося з «своїм» (cosine similarity ≥ `FACE_MATCH_THRESHOLD`), і цю людину не бачили ≥ cooldown.
+- `stranger_detected` — обличчя знайдене, але не збіглося ні з ким, 5 циклів детекції поспіль (~0.5 с), і чужого не бачили ≥ cooldown. Якщо в кадрі одна людина, яку впізнали менш ніж 3 с тому, невпізнане обличчя вважається поворотом голови «свого», а не чужим.
 
 ## web → api: `GET /events?limit=50&offset=0`
 
@@ -70,15 +72,28 @@ vision надсилає подію, коли змінюється ситуаці
 
 Відповідь `200`: оновлений `EventRecord`; api також розсилає `event_updated` усім операторам.
 
-## web → api: `GET /persons`, `POST /persons`
+## web → api: «свої»
 
-Список «своїх» і створення нового. Поки лише ім'я; фото й вектори облич — етап 5.
+| Метод | Шлях | Опис |
+|---|---|---|
+| `GET` | `/persons` | список з кількістю фото: `[{ "id", "name", "created_at", "photo_count" }]` |
+| `POST` | `/persons` | `{ "name": "Максим" }` → `PersonRecord` |
+| `POST` | `/persons/:id/photos` | multipart, поле `photos` (1–5 зображень, до 10 МБ) → `AddPhotosResult` |
+| `POST` | `/persons/:id/capture` | зняти обличчя з поточного кадру камери → `AddPhotosResult` або `422` з причиною |
+| `DELETE` | `/persons/:id` | видалити людину, її вектори й фото → `204` |
 
-```json
-{ "name": "Максим" }
-```
+`AddPhotosResult`: `{ "added": 2, "failed": [{ "file": "a.jpg", "reason": "no_face" }] }`. Причини відмови: `no_face`, `multiple_faces`, `invalid_image`.
 
-Відповідь: `{ "id": "3b1e…", "name": "Максим", "created_at": "…" }`.
+Фото зберігаються в Supabase Storage (бакет `faces`, приватний) лише для повторного обчислення векторів; для розпізнавання використовуються тільки вектори з `face_embeddings`. Після кожної зміни api викликає `vision POST /faces/reload`.
+
+## vision ↔ api: обличчя
+
+| Хто викликає | Ендпоінт | Опис |
+|---|---|---|
+| vision → api | `GET /persons/embeddings` | `[{ "person_id", "name", "embedding": [128 чисел] }]`; vision завантажує при старті (повторює кожні 5 с, поки api недоступний) і після `/faces/reload` |
+| api → vision | `POST /faces/embed` | тіло — байти зображення → `{ "embedding": [128] }`; `422 { "detail": "no_face" \| "multiple_faces" }`, `400 invalid_image` |
+| api → vision | `POST /faces/capture` | поточний кадр камери → `{ "embedding": [128], "image": "<base64 JPEG>" }`; `422` як вище, `503 no_frame` |
+| api → vision | `POST /faces/reload` | перечитати вектори з api → `{ "embeddings": N }` |
 
 ## api → web: WebSocket `/operator`
 
