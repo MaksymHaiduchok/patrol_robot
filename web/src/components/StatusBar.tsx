@@ -1,4 +1,5 @@
-import type { SystemMode, VisionHealth } from "@/lib/types";
+import type { SystemMode } from "@/lib/protocol";
+import type { VisionHealth } from "@/lib/types";
 
 type StatusBarProps = {
   health: VisionHealth | null;

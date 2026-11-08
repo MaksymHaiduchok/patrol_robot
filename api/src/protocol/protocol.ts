@@ -1,6 +1,9 @@
-export type EventType = 'person_detected' | 'known_person' | 'stranger_detected' | 'person_left';
+export type EventType =
+  'person_detected' | 'known_person' | 'stranger_detected' | 'person_left';
 
 export type SystemMode = 'PATROL' | 'STATIONARY';
+
+export type ReviewStatus = 'known' | 'known_pending' | 'stranger';
 
 export type VisionEvent = {
   type: EventType;
@@ -17,6 +20,8 @@ export type EventRecord = {
   snapshot_path: string | null;
   description: string | null;
   mode: SystemMode | null;
+  review_status: ReviewStatus | null;
+  reviewed_at: string | null;
   created_at: string;
 };
 
@@ -24,3 +29,22 @@ export type EventsPage = {
   items: EventRecord[];
   total: number;
 };
+
+export type ReviewEventRequest = {
+  status: ReviewStatus;
+  person_id: string | null;
+};
+
+export type PersonRecord = {
+  id: string;
+  name: string;
+  created_at: string;
+};
+
+export type CreatePersonRequest = {
+  name: string;
+};
+
+export type OperatorServerMessage =
+  | { type: 'event_created'; event: EventRecord }
+  | { type: 'event_updated'; event: EventRecord };

@@ -11,7 +11,8 @@ from fastapi.responses import StreamingResponse
 
 from annotate import draw_persons
 from capture import FrameGrabber
-from detector import PersonDetector
+from detector import PersonBox, PersonDetector
+from events import EventSender, PresenceTracker
 
 load_dotenv()
 
@@ -34,6 +35,17 @@ detector = PersonDetector(
     max_fps=float(os.getenv("DETECTION_MAX_FPS", "10")),
 )
 grabber.set_annotator(lambda frame: draw_persons(frame, detector.boxes()))
+presence = PresenceTracker(cooldown_seconds=float(os.getenv("EVENT_COOLDOWN_SECONDS", "15")))
+sender = EventSender(os.getenv("API_URL", "http://localhost:4000"))
+
+
+def on_detections(boxes: list[PersonBox], now: float) -> None:
+    event = presence.update(boxes, now)
+    if event is not None:
+        sender.send(event)
+
+
+detector.set_listener(on_detections)
 
 
 @asynccontextmanager
@@ -44,6 +56,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
     detector.stop()
     grabber.stop()
+    sender.close()
     logger.info("vision stopped")
 
 

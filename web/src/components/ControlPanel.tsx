@@ -1,7 +1,8 @@
 "use client";
 
 import { type ReactNode, useEffect, useState } from "react";
-import type { ControlMode, Direction, SystemMode } from "@/lib/types";
+import type { SystemMode } from "@/lib/protocol";
+import type { ControlMode, Direction } from "@/lib/types";
 
 const KEY_DIRECTIONS: Record<string, Direction> = {
   w: "forward",

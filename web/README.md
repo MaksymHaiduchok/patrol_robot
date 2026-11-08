@@ -21,4 +21,4 @@ pnpm dev
 | `NEXT_PUBLIC_VISION_URL` | HTTP-адреса vision (для `/health`) |
 | `NEXT_PUBLIC_VISION_STREAM_URL` | MJPEG-стрім від vision |
 | `NEXT_PUBLIC_SUPABASE_URL` | URL проєкту Supabase |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon key Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | публічний ключ Supabase (`sb_publishable_…`) |

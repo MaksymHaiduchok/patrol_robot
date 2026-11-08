@@ -2,6 +2,7 @@ import logging
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -23,6 +24,9 @@ class PersonBox:
     x2: int
     y2: int
     confidence: float
+
+
+DetectionListener = Callable[[list[PersonBox], float], None]
 
 
 class FrameSource(Protocol):
@@ -52,10 +56,14 @@ class PersonDetector:
         self._min_interval = 1.0 / max_fps
         self._lock = threading.Lock()
         self._boxes: list[PersonBox] = []
+        self._listener: DetectionListener | None = None
         self._inference_ms: deque[float] = deque(maxlen=STATS_WINDOW_SIZE)
         self._timestamps: deque[float] = deque(maxlen=STATS_WINDOW_SIZE)
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="person-detector", daemon=True)
+
+    def set_listener(self, listener: DetectionListener) -> None:
+        self._listener = listener
 
     def start(self) -> None:
         self._warm_up()
@@ -123,6 +131,9 @@ class PersonDetector:
                 self._boxes = boxes
                 self._inference_ms.append(inference_ms)
                 self._timestamps.append(time.monotonic())
+
+            if self._listener is not None:
+                self._listener(boxes, time.monotonic())
 
             if len(boxes) != last_count:
                 logger.info("persons in frame: %d", len(boxes))
