@@ -8,8 +8,8 @@ type Label = {
 export const EVENT_LABELS: Record<EventType, Label> = {
   person_detected: { text: "Людина в кадрі", dotClassName: "bg-ok" },
   known_person: { text: "Свій", dotClassName: "bg-accent" },
-  stranger_detected: { text: "Чужий", dotClassName: "bg-live" },
-  person_left: { text: "Людина пішла", dotClassName: "bg-muted" },
+  stranger_detected: { text: "Чужий", dotClassName: "bg-danger" },
+  person_left: { text: "Людина пішла", dotClassName: "bg-ev-left" },
 };
 
 const REVIEW_LABELS: Record<ReviewStatus, string> = {

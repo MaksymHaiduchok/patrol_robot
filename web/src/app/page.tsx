@@ -1,5 +1,5 @@
-import { OperatorDashboard } from "@/components/OperatorDashboard";
+import { OperatorPanel } from "@/components/panel/OperatorPanel";
 
-export default function OperatorPage() {
-  return <OperatorDashboard />;
+export default function PanelPage() {
+  return <OperatorPanel />;
 }

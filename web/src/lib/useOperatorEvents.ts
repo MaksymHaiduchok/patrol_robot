@@ -11,9 +11,11 @@ const RECONNECT_DELAY_MS = 2000;
 type OperatorEvents = {
   events: EventRecord[];
   connected: boolean;
+  apiDown: boolean;
   pendingReview: EventRecord[];
   applyUpdate: (event: EventRecord) => void;
   dismissReview: (id: string) => void;
+  reopenReview: (event: EventRecord) => void;
 };
 
 function upsert(events: EventRecord[], event: EventRecord): EventRecord[] {
@@ -24,7 +26,7 @@ function upsert(events: EventRecord[], event: EventRecord): EventRecord[] {
 
 export function useOperatorEvents(): OperatorEvents {
   const [events, setEvents] = useState<EventRecord[]>([]);
-  const [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState<boolean | null>(null);
   const [pendingReview, setPendingReview] = useState<EventRecord[]>([]);
 
   const applyUpdate = useCallback((event: EventRecord) => {
@@ -36,6 +38,12 @@ export function useOperatorEvents(): OperatorEvents {
 
   const dismissReview = useCallback((id: string) => {
     setPendingReview((current) => current.filter((item) => item.id !== id));
+  }, []);
+
+  const reopenReview = useCallback((event: EventRecord) => {
+    setPendingReview((current) =>
+      current.some((item) => item.id === event.id) ? current : [event, ...current],
+    );
   }, []);
 
   useEffect(() => {
@@ -79,5 +87,13 @@ export function useOperatorEvents(): OperatorEvents {
     };
   }, [applyUpdate]);
 
-  return { events, connected, pendingReview, applyUpdate, dismissReview };
+  return {
+    events,
+    connected: connected === true,
+    apiDown: connected === false,
+    pendingReview,
+    applyUpdate,
+    dismissReview,
+    reopenReview,
+  };
 }

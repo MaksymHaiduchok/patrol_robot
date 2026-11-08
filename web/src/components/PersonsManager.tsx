@@ -23,9 +23,9 @@ type Notice = {
 };
 
 const BUTTON = "rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50";
-const PRIMARY = `${BUTTON} bg-accent text-white hover:bg-accent-hover`;
-const SECONDARY = `${BUTTON} bg-surface-raised hover:bg-border`;
-const DANGER = `${BUTTON} bg-live text-white hover:opacity-90`;
+const PRIMARY = `${BUTTON} bg-accent text-accent-on hover:bg-accent-hover`;
+const SECONDARY = `${BUTTON} bg-surface-2 hover:bg-border`;
+const DANGER = `${BUTTON} bg-danger text-white hover:opacity-90`;
 
 function photosNotice(result: AddPhotosResult): Notice {
   if (result.failed.length === 0) {
@@ -40,7 +40,7 @@ function photosNotice(result: AddPhotosResult): Notice {
 
 function NoticeText({ notice }: { notice: Notice | null }) {
   if (!notice) return null;
-  return <p className={`text-sm ${notice.tone === "ok" ? "text-ok" : "text-live"}`}>{notice.text}</p>;
+  return <p className={`text-sm ${notice.tone === "ok" ? "text-ok-text" : "text-danger-text"}`}>{notice.text}</p>;
 }
 
 function PersonCard({ person, onChanged }: { person: PersonSummary; onChanged: () => void }) {
@@ -88,8 +88,8 @@ function PersonCard({ person, onChanged }: { person: PersonSummary; onChanged: (
     <li className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
       <div className="flex items-baseline justify-between gap-3">
         <span className="font-semibold">{person.name}</span>
-        <span className={`text-xs ${person.photo_count ? "text-muted" : "text-warn"}`}>
-          {person.photo_count ? `фото: ${person.photo_count}` : "немає фото — не розпізнається"}
+        <span className={`text-xs ${person.photo_count ? "text-text-muted" : "text-warn-text"}`}>
+          {person.photo_count ? `Фото: ${person.photo_count}` : "Немає фото — не розпізнається"}
         </span>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -147,7 +147,7 @@ function AddPersonForm({ onChanged }: { onChanged: () => void }) {
     <form onSubmit={submit} className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
       <h2 className="font-semibold">Додати людину</h2>
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="text-muted">Ім&apos;я</span>
+        <span className="text-text-muted">Ім&apos;я</span>
         <input
           value={name}
           onChange={(changeEvent) => setName(changeEvent.target.value)}
@@ -157,16 +157,16 @@ function AddPersonForm({ onChanged }: { onChanged: () => void }) {
         />
       </label>
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="text-muted">Фото обличчя (до {MAX_PHOTOS}, необов&apos;язково)</span>
+        <span className="text-text-muted">Фото обличчя (до {MAX_PHOTOS}, необов&apos;язково)</span>
         <input
           type="file"
           accept="image/*"
           multiple
           onChange={(changeEvent) => setFiles(Array.from(changeEvent.target.files ?? []).slice(0, MAX_PHOTOS))}
-          className="text-sm text-muted file:mr-3 file:rounded-md file:border-0 file:bg-surface-raised file:px-3 file:py-1.5 file:text-foreground"
+          className="text-sm text-text-muted file:mr-3 file:rounded-md file:border-0 file:bg-surface-2 file:px-3 file:py-1.5 file:text-text"
         />
       </label>
-      <p className="text-xs text-muted">
+      <p className="text-xs text-text-muted">
         На кожному фото — рівно одне обличчя анфас. Тестувати лише на людях, які дали згоду.
       </p>
       <button type="submit" className={`${PRIMARY} py-2`} disabled={busy || !name.trim()}>
@@ -183,7 +183,7 @@ export function PersonsManager() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header online={health?.source_connected ?? false} />
+      <Header live={health?.source_connected ?? false} />
       <main className="mx-auto grid w-full max-w-6xl gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <section className="flex flex-col gap-4">
           <div className="overflow-hidden rounded-lg border border-border bg-black">
@@ -195,10 +195,10 @@ export function PersonsManager() {
         <section className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between">
             <h1 className="text-lg font-semibold">Свої</h1>
-            <span className="text-sm text-muted">{persons.length}</span>
+            <span className="text-sm text-text-muted">{persons.length}</span>
           </div>
           {loaded && persons.length === 0 && (
-            <p className="rounded-lg border border-border bg-surface p-6 text-center text-muted">
+            <p className="rounded-lg border border-border bg-surface p-6 text-center text-text-muted">
               Поки нікого немає
             </p>
           )}

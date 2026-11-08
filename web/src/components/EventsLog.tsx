@@ -9,7 +9,7 @@ import { usePersons } from "@/lib/usePersons";
 import { useVisionHealth } from "@/lib/useVisionHealth";
 
 const PAGE_SIZE = 25;
-const MODE_LABELS: Record<SystemMode, string> = { PATROL: "патруль", STATIONARY: "стаціонар" };
+const MODE_LABELS: Record<SystemMode, string> = { PATROL: "Патруль", STATIONARY: "Стаціонар" };
 
 export function EventsLog() {
   const health = useVisionHealth();
@@ -38,18 +38,18 @@ export function EventsLog() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header online={health?.source_connected ?? false} />
+      <Header live={health?.source_connected ?? false} />
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
         <div className="flex items-baseline justify-between">
           <h1 className="text-lg font-semibold">Журнал подій</h1>
-          {data && <span className="text-sm text-muted">усього {data.total}</span>}
+          {data && <span className="text-sm text-text-muted">Усього: {data.total}</span>}
         </div>
 
-        {error && <p className="text-live">Не вдалося завантажити події. Перевір, чи запущений api.</p>}
+        {error && <p className="text-danger-text">Не вдалося завантажити події. Перевір, чи запущений api.</p>}
 
         <div className="overflow-x-auto rounded-lg border border-border bg-surface">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-border text-xs uppercase tracking-wide text-muted">
+            <thead className="border-b border-border text-xs uppercase tracking-wide text-text-muted">
               <tr>
                 <th className="px-4 py-3 font-semibold">Час</th>
                 <th className="px-4 py-3 font-semibold">Подія</th>
@@ -61,23 +61,23 @@ export function EventsLog() {
             <tbody>
               {data?.items.map((event) => (
                 <tr key={event.id} className="border-b border-border last:border-0">
-                  <td className="whitespace-nowrap px-4 py-3 text-muted">{formatDateTime(event.created_at)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-text-muted">{formatDateTime(event.created_at)}</td>
                   <td className="px-4 py-3">
                     <span className="flex items-center gap-2">
                       <span className={`size-2 rounded-full ${EVENT_LABELS[event.type].dotClassName}`} />
                       {eventTitle(event, names)}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-muted">
+                  <td className="px-4 py-3 text-text-muted">
                     {event.confidence !== null ? `${Math.round(event.confidence * 100)}%` : "—"}
                   </td>
-                  <td className="px-4 py-3">{reviewLabel(event, names) ?? <span className="text-muted">—</span>}</td>
-                  <td className="px-4 py-3 text-muted">{event.mode ? MODE_LABELS[event.mode] : "—"}</td>
+                  <td className="px-4 py-3">{reviewLabel(event, names) ?? <span className="text-text-muted">—</span>}</td>
+                  <td className="px-4 py-3 text-text-muted">{event.mode ? MODE_LABELS[event.mode] : "—"}</td>
                 </tr>
               ))}
               {data?.items.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted">
+                  <td colSpan={5} className="px-4 py-8 text-center text-text-muted">
                     Подій поки немає
                   </td>
                 </tr>
@@ -91,18 +91,18 @@ export function EventsLog() {
             type="button"
             disabled={page === 0}
             onClick={() => setPage((value) => value - 1)}
-            className="rounded bg-surface-raised px-3 py-1.5 hover:bg-border disabled:opacity-40"
+            className="rounded bg-surface-2 px-3 py-1.5 hover:bg-border disabled:opacity-40"
           >
             Назад
           </button>
-          <span className="text-muted">
+          <span className="text-text-muted">
             {page + 1} / {totalPages}
           </span>
           <button
             type="button"
             disabled={page + 1 >= totalPages}
             onClick={() => setPage((value) => value + 1)}
-            className="rounded bg-surface-raised px-3 py-1.5 hover:bg-border disabled:opacity-40"
+            className="rounded bg-surface-2 px-3 py-1.5 hover:bg-border disabled:opacity-40"
           >
             Далі
           </button>
