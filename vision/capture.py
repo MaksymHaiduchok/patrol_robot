@@ -2,14 +2,18 @@ import logging
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
 
 import cv2
+import numpy as np
 
 logger = logging.getLogger("vision.capture")
 
 RECONNECT_DELAY_SECONDS = 2.0
 JPEG_QUALITY = 80
 FPS_WINDOW_SIZE = 30
+
+Annotator = Callable[[np.ndarray], None]
 
 
 def parse_source(source: str) -> int | str:
@@ -19,13 +23,18 @@ def parse_source(source: str) -> int | str:
 class FrameGrabber:
     def __init__(self, source: str) -> None:
         self.source = parse_source(source)
+        self._annotator: Annotator | None = None
         self._lock = threading.Lock()
+        self._frame: np.ndarray | None = None
         self._jpeg: bytes | None = None
         self._frame_id = 0
         self._connected = False
         self._timestamps: deque[float] = deque(maxlen=FPS_WINDOW_SIZE)
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="frame-grabber", daemon=True)
+
+    def set_annotator(self, annotator: Annotator) -> None:
+        self._annotator = annotator
 
     def start(self) -> None:
         self._thread.start()
@@ -37,6 +46,10 @@ class FrameGrabber:
     def latest(self) -> tuple[int, bytes | None]:
         with self._lock:
             return self._frame_id, self._jpeg
+
+    def latest_frame(self) -> tuple[int, np.ndarray | None]:
+        with self._lock:
+            return self._frame_id, self._frame
 
     @property
     def connected(self) -> bool:
@@ -72,11 +85,16 @@ class FrameGrabber:
             if not ok:
                 return
 
-            ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+            annotated = frame.copy()
+            if self._annotator is not None:
+                self._annotator(annotated)
+
+            ok, encoded = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
             if not ok:
                 continue
 
             with self._lock:
+                self._frame = frame
                 self._jpeg = encoded.tobytes()
                 self._frame_id += 1
                 self._timestamps.append(time.monotonic())

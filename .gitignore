@@ -19,3 +19,5 @@ __pycache__/
 vision/models/
 *.pt
 *.onnx
+
+vision/faces_demo/

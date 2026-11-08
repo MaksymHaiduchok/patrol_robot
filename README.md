@@ -23,7 +23,7 @@
 Кожен сервіс запускається окремо, у своєму терміналі. Перед першим запуском скопіюй `.env.example` → `.env` (для web → `.env.local`).
 
 ```bash
-cd vision && uv sync && uv run uvicorn main:app --reload --port 8001 --timeout-graceful-shutdown 1
+cd vision && uv sync && uv run python scripts/download_models.py && uv run uvicorn main:app --reload --port 8001 --timeout-graceful-shutdown 1
 cd api && pnpm install && pnpm start:dev
 cd web && pnpm install && pnpm dev
 ```

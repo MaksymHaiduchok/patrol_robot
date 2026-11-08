@@ -9,7 +9,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
+from annotate import draw_persons
 from capture import FrameGrabber
+from detector import PersonDetector
 
 load_dotenv()
 
@@ -24,13 +26,23 @@ STREAM_BOUNDARY = "frame"
 STREAM_POLL_SECONDS = 0.01
 
 grabber = FrameGrabber(os.getenv("PHONE_STREAM_URL", "0"))
+detector = PersonDetector(
+    source=grabber,
+    model_path=os.getenv("YOLO_MODEL", "models/yolo11n.pt"),
+    device=os.getenv("YOLO_DEVICE", "mps"),
+    confidence=float(os.getenv("PERSON_CONFIDENCE", "0.5")),
+    max_fps=float(os.getenv("DETECTION_MAX_FPS", "10")),
+)
+grabber.set_annotator(lambda frame: draw_persons(frame, detector.boxes()))
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     grabber.start()
-    logger.info("vision started, source=%s", grabber.source)
+    detector.start()
+    logger.info("vision started, source=%s, device=%s", grabber.source, detector.device)
     yield
+    detector.stop()
     grabber.stop()
     logger.info("vision stopped")
 
@@ -76,4 +88,14 @@ def health() -> dict[str, str | bool | float]:
         "status": "ok" if grabber.connected else "no_source",
         "source_connected": grabber.connected,
         "fps": round(grabber.fps, 1),
+    }
+
+
+@app.get("/metrics")
+def metrics() -> dict[str, str | int | float]:
+    return {
+        "capture_fps": round(grabber.fps, 1),
+        **detector.stats(),
+        "persons_in_frame": len(detector.boxes()),
+        "device": detector.device,
     }
