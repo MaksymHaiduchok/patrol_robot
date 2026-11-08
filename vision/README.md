@@ -7,12 +7,12 @@
 ```bash
 cp .env.example .env
 uv sync
-uv run uvicorn main:app --reload --port 8001
+uv run uvicorn main:app --reload --port 8001 --timeout-graceful-shutdown 1
 ```
 
 Перевірка: http://localhost:8001/health (стан і FPS), http://localhost:8001/stream (відео).
 
-При першому запуску з камерою Mac macOS спитає дозвіл на камеру для терміналу.
+При першому запуску з камерою Mac macOS спитає дозвіл на камеру для терміналу. Якщо поруч iPhone з Continuity Camera, він може зайняти індекс `0`, а вбудована камера стане `1`.
 
 Форматування і лінтер: `uv run ruff format . && uv run ruff check .`
 
@@ -27,3 +27,4 @@ uv run uvicorn main:app --reload --port 8001
 | `PERSON_CONFIDENCE` | поріг впевненості детекції людини |
 | `FACE_MATCH_THRESHOLD` | поріг cosine similarity для SFace |
 | `EVENT_COOLDOWN_SECONDS` | антидребезг подій |
+| `CORS_ORIGINS` | дозволені origin-и для браузера (через кому) |
