@@ -10,7 +10,9 @@ uv sync
 uv run uvicorn main:app --reload --port 8001
 ```
 
-Перевірка: http://localhost:8001/health.
+Перевірка: http://localhost:8001/health (стан і FPS), http://localhost:8001/stream (відео).
+
+При першому запуску з камерою Mac macOS спитає дозвіл на камеру для терміналу.
 
 Форматування і лінтер: `uv run ruff format . && uv run ruff check .`
 
@@ -18,7 +20,7 @@ uv run uvicorn main:app --reload --port 8001
 
 | Змінна | Опис |
 |---|---|
-| `PHONE_STREAM_URL` | MJPEG-стрім IP Webcam на телефоні |
+| `PHONE_STREAM_URL` | джерело відео: `0` — камера Mac, `http://<PHONE_IP>:8080/video` — IP Webcam на телефоні |
 | `API_URL` | адреса api |
 | `YOLO_MODEL` | файл моделі YOLO |
 | `YOLO_DEVICE` | `mps` або `cpu` |
