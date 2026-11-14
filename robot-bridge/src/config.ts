@@ -113,12 +113,12 @@ export const loadConfig = (): Config => ({
     forwardMs: readNumber("HIDE_FORWARD_MS", 1500),
   },
   returnHome: {
-    speed: readNumber("RETURN_SPEED", 60),
+    speed: readNumber("RETURN_SPEED", 40),
     slowSpeed: readNumber("RETURN_SLOW_SPEED", 20),
-    slowZoneDegrees: readNumber("RETURN_SLOW_ZONE_DEGREES", 180),
+    slowZoneDegrees: readNumber("RETURN_SLOW_ZONE_DEGREES", 120),
     steerTimeoutMs: readNumber("RETURN_STEER_TIMEOUT_MS", 1500),
     stallMs: readNumber("RETURN_STALL_MS", 1500),
     toleranceDegrees: readNumber("RETURN_TOLERANCE_DEGREES", 10),
-    steerLookaheadMs: readNumber("RETURN_STEER_LOOKAHEAD_MS", 150),
+    steerLookaheadMs: readNumber("RETURN_STEER_LOOKAHEAD_MS", 90),
   },
 });
