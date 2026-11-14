@@ -109,6 +109,56 @@ vision надсилає подію, коли змінюється ситуаці
 
 Web при відкритті завантажує останні події через `GET /events`, далі отримує нові через WebSocket; при розриві перепідключається кожні 2 с.
 
+## api ↔ robot: WebSocket `/robot`
+
+Робота представляє `robot-bridge` (Мак, Bluetooth LE до LEGO Technic Hub). Він підключається до `/robot` як клієнт і перепідключається кожні 2 с. Типи — `robot-bridge/src/protocol.ts`; на боці api ще не реалізовано (етап 7).
+
+### api → robot
+
+```json
+{ "type": "command", "cmd": "move", "dir": "forward", "speed": 40 }
+{ "type": "command", "cmd": "turn", "dir": "left", "speed": 40 }
+{ "type": "command", "cmd": "stop" }
+{ "type": "command", "cmd": "set_state", "state": "PATROL" }
+{ "type": "command", "cmd": "alert" }
+{ "type": "command", "cmd": "resume" }
+{ "type": "command", "cmd": "hide" }
+{ "type": "command", "cmd": "servo", "pan": 90, "tilt": 90 }
+{ "type": "ping", "ts": 1731050000000 }
+```
+
+| Команда | Дія на платформі 42160 |
+|---|---|
+| `move` `forward`/`backward` | кермо прямо, хід ±`speed`% |
+| `move`/`turn` `left`/`right` | кермо в бік, хід вперед на `speed`% |
+| `stop` | гальмо, кермо прямо |
+| `set_state` | змінити стан; `IDLE` і `ALERT` також зупиняють мотори |
+| `alert` | стоп і стан `ALERT` |
+| `resume` | повернути стан, що був до `alert` |
+| `hide` | маневр за часом: назад → поворот → вперед (параметри в `.env` моста), далі стоп і `ALERT`; переривається будь-якою командою руху, `stop`, `alert` або watchdog |
+| `servo` | не підтримується, ігнорується без `ack` |
+
+`dir`: `forward` \| `backward` \| `left` \| `right`. `speed`: 0–100. `state`: `IDLE` \| `PATROL` \| `ALERT` \| `MANUAL`.
+api шле `ping` раз на секунду. Немає `ping` довше `WATCHDOG_SECONDS` (2 с) → міст зупиняє мотори.
+
+### robot → api
+
+```json
+{ "type": "hello", "robot_id": "lego-audi-01" }
+{ "type": "telemetry", "state": "PATROL", "distance_cm": null, "hub": "online", "battery": 87, "ts": 1731050000000 }
+{ "type": "pong", "ts": 1731050000000 }
+{ "type": "ack", "cmd": "alert", "ts": 1731050000000 }
+```
+
+| Поле телеметрії | Опис |
+|---|---|
+| `state` | поточний стан робота |
+| `distance_cm` | відстань до перешкоди; на 42160 датчика немає — завжди `null` |
+| `hub` | `online` \| `offline` — зв'язок моста з Technic Hub по Bluetooth |
+| `battery` | заряд хаба, %; `null`, коли хаб offline |
+
+Телеметрія йде кожні 300 мс. `pong` повертає `ts` з `ping` (для заміру затримки). `ack` — команду виконано; поки хаб offline, команди (крім `set_state`) ігноруються без `ack`.
+
 ## Ще не реалізовано
 
-WebSocket `/robot` (api ↔ robot) і повідомлення web → api через `/operator` (`control`, `set_mode`, `resume`) — етап 7, попередній опис у `CLAUDE.md`, розділ 10.
+Обробка `/robot` на боці api і повідомлення web → api через `/operator` (`control`, `set_mode`, `resume`) — етап 7, попередній опис у `CLAUDE.md`, розділ 10.

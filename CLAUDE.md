@@ -25,11 +25,12 @@
 | Компонент | Роль |
 |---|---|
 | Старий Android-смартфон + застосунок **IP Webcam** | Джерело відео (MJPEG по Wi-Fi, `http://<PHONE_IP>:8080/video`) |
-| MacBook (розробка і запуск сервісів) | Vision, API, Web |
-| Raspberry Pi Zero 2W | Бортовий контролер робота |
-| Freenove 4WD Smart Car Kit (FNK0043) | Шасі: 4 мотори (PCA9685/I2C), серво поворотної голови, ультразвуковий датчик |
+| MacBook (розробка і запуск сервісів) | Vision, API, Web, robot-bridge |
+| LEGO Technic Audi RS Q e-tron (42160) з Technic Hub (Control+) | Шасі: 3 мотори Technic L — порт A задні колеса, B передні колеса, D кермо; керування з Мака по Bluetooth LE |
 
-Усі пристрої в одній Wi-Fi мережі.
+Телефон і Мак в одній Wi-Fi мережі, хаб підключений до Мака по Bluetooth.
+Датчика відстані й поворотної голови на платформі немає.
+Початковий варіант (Freenove 4WD FNK0043 + Raspberry Pi Zero 2W) відкинуто — див. `docs/decisions.md`.
 
 ## 3. Архітектура
 
@@ -42,13 +43,13 @@
                                                                                        │
                                                                                 WS /robot (JSON)
                                                                                        ▼
-                                                              [robot (Python, Pi Zero 2W)] ──► Freenove: мотори, серво, ультразвук
+                                                       [robot-bridge (Node.js, Mac)] ──Bluetooth LE──► LEGO Technic Hub: мотори ходу й керма
 ```
 
 **Ключові принципи:**
 - `vision` займається **лише комп'ютерним зором**: читає відео, детектує, розпізнає й шле події. Він не знає про робота і не викликає Claude.
 - `api` — **диспетчер**: приймає події, ухвалює рішення (зупинити робота, сповістити оператора), працює з Supabase, викликає Claude API, тримає WebSocket із роботом і з фронтендом.
-- `robot` — **виконавець**: виконує команди, локально оминає перешкоди, шле телеметрію.
+- `robot-bridge` — **виконавець**: транслює команди в мотори хаба, зупиняє їх за watchdog, шле телеметрію.
 - Команда `stop`/`alert` роботу надсилається **одразу** після отримання події, а запис у БД, завантаження знімка і виклик Claude йдуть **після або паралельно**. Ніколи не чекати БД перед командою.
 
 ## 4. Структура репозиторію
@@ -62,7 +63,8 @@ patrol-robot/
 ├── web/                 # Next.js (App Router) + TypeScript + Tailwind
 ├── api/                 # NestJS + TypeScript
 ├── vision/              # Python 3.11+, FastAPI, OpenCV, Ultralytics, керується через uv
-├── robot/               # Python для Raspberry Pi Zero 2W
+├── robot-bridge/        # Node.js + TypeScript: міст api ↔ LEGO Technic Hub (BLE)
+├── robot/               # відкинутий варіант (Raspberry Pi Zero 2W + Freenove), не розвивається
 ├── fake-robot/          # Python або Node: імітатор робота для розробки без заліза
 └── docs/
     ├── protocol.md      # повний опис повідомлень між сервісами (джерело правди)
@@ -79,7 +81,7 @@ patrol-robot/
 | web | Next.js, TypeScript, Tailwind, Supabase JS client | 3000 | `cd web && pnpm dev` |
 | api | NestJS, TypeScript, `@nestjs/websockets` (ws або Socket.IO), Supabase JS, `@anthropic-ai/sdk` | 4000 | `cd api && pnpm start:dev` |
 | vision | Python 3.11+, FastAPI, uvicorn, opencv-python, ultralytics (YOLO11n), OpenCV YuNet + SFace, httpx | 8001 | `cd vision && uv run uvicorn main:app --reload --port 8001` |
-| robot | Python 3, `websockets`, драйвери з прикладів Freenove | — | на Pi: `python3 main.py` |
+| robot-bridge | Node.js, TypeScript, `node-poweredup` (BLE), вбудований `WebSocket` | — | `cd robot-bridge && pnpm start` |
 | fake-robot | Python `websockets` | — | `cd fake-robot && uv run main.py` |
 
 Менеджер пакетів JS: **pnpm**. Python: **uv**.
@@ -119,12 +121,23 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ```
 
-**robot/.env**
+**robot-bridge/.env** (повний перелік — `robot-bridge/README.md`)
 ```
-API_WS_URL=ws://<MAC_IP>:4000/robot
-ROBOT_ID=freenove-01
-OBSTACLE_STOP_CM=20
+API_WS_URL=ws://localhost:4000/robot
+ROBOT_ID=lego-audi-01
+DRIVE_PORTS=A,B
+DRIVE_INVERTED_PORTS=
+STEER_PORT=D
+STEER_INVERTED=false
+STEER_ANGLE=60
 WATCHDOG_SECONDS=2
+HIDE_BACK_SPEED=50
+HIDE_BACK_MS=1500
+HIDE_TURN_SIDE=left
+HIDE_TURN_SPEED=40
+HIDE_TURN_MS=1500
+HIDE_FORWARD_SPEED=50
+HIDE_FORWARD_MS=1500
 ```
 
 ## 7. Сервіс `vision`
@@ -228,14 +241,16 @@ Storage buckets: `snapshots` (знімки подій), `faces` (фото «св
 { "type": "command", "cmd": "set_state", "state": "PATROL" }
 { "type": "command", "cmd": "alert" }
 { "type": "command", "cmd": "resume" }
+{ "type": "command", "cmd": "hide" }
 { "type": "ping", "ts": 1731050000000 }
 ```
 `dir`: `forward` | `backward` | `left` | `right`. `speed`: 0–100. `state`: `IDLE` | `PATROL` | `ALERT` | `MANUAL`.
+`hide` — заздалегідь заданий маневр за часом (назад → поворот → вперед), після нього робот у `ALERT`. `servo` платформа 42160 не підтримує.
 
 Від робота до api:
 ```json
-{ "type": "hello", "robot_id": "freenove-01" }
-{ "type": "telemetry", "state": "PATROL", "distance_cm": 57, "ts": 1731050000000 }
+{ "type": "hello", "robot_id": "lego-audi-01" }
+{ "type": "telemetry", "state": "PATROL", "distance_cm": null, "hub": "online", "battery": 87, "ts": 1731050000000 }
 { "type": "pong", "ts": 1731050000000 }
 { "type": "ack", "cmd": "alert", "ts": 1731050000000 }
 ```
@@ -245,21 +260,27 @@ api шле `ping` раз на секунду, а телеметрія від р�
 Від api до web: `event_created`, `event_updated` (з'явився опис Claude), `robot_status` (online/offline, state, distance_cm), `system_mode` (`PATROL`/`STATIONARY`).
 Від web до api: `control` (ті самі команди, що для робота, для ручного керування), `set_mode`, `resume`.
 
-## 11. Робот (`robot/`)
+## 11. Робот (`robot-bridge/`)
 
-### Автомат станів
+Процес на Маку, який для api виглядає як робот (WebSocket `/robot`), а моторами хаба керує по Bluetooth LE через `node-poweredup`. Порти й параметри — в `.env`. Під час підключення до хаба поточне положення мотора керма стає нулем, тому колеса перед запуском виставляються прямо.
+
+### Команди
+- `move forward/backward` — кермо прямо, хід ±`speed`%; `move left/right` і `turn left/right` — кермо в бік на `STEER_ANGLE`° і хід вперед (машина не розвертається на місці).
+- `stop` — гальмо, кермо прямо. `alert` — те саме і стан `ALERT`; `resume` повертає стан, що був до `alert`.
+- `hide` — маневр за часом (назад → поворот → вперед), далі стоп і `ALERT`. Будь-яка інша команда руху, `stop`, `alert` або watchdog його перериває.
+
+### Стани
 - `IDLE` — стоїть, чекає команд.
-- `PATROL` — їде вперед; при перешкоді < `OBSTACLE_STOP_CM` зупиняється, повертає серво з ультразвуком вліво/вправо, міряє відстань і повертає туди, де вільніше («мінілідар»).
-- `ALERT` — стоїть на місці, датчик дивиться вперед.
+- `PATROL` — без датчика відстані машина сама не їде; рухається за командами від api.
+- `ALERT` — стоїть на місці.
 - `MANUAL` — лише команди оператора.
 
 ### Пріоритети (від найвищого)
-1. Перешкода ближче `OBSTACLE_STOP_CM` → стоп (локально, незалежно від сервера).
-2. Немає `ping` від сервера довше `WATCHDOG_SECONDS` → стоп (watchdog).
-3. Команди сервера (`alert`, `stop`, ручне керування).
-4. Логіка патрулювання.
+1. Немає `ping` від api довше `WATCHDOG_SECONDS` → стоп (watchdog).
+2. Втрата зв'язку з хабом → `hub: "offline"` у телеметрії, команди руху ігноруються, міст шукає хаб знову.
+3. Команди сервера (`alert`, `stop`, `hide`, ручне керування).
 
-Драйвери моторів, серво й ультразвуку беруться з офіційних прикладів Freenove для FNK0043 і кладуться в `robot/freenove/`. Свою логіку пиши поверх них, не переписуючи драйвери.
+Діагностика портів: `pnpm probe` знаходить хаб, показує пристрої на A–D і по черзі крутить кожен мотор.
 
 ### fake-robot
 Підключається до `/robot` так само, як справжній, логує команди в консоль, симулює стан і шле фейкову телеметрію (`distance_cm` випадково 20–200). Дозволяє розробити й перевірити api + web без заліза.
@@ -288,11 +309,11 @@ api шле `ping` раз на секунду, а телеметрія від р�
 | 5 | Розпізнавання облич: YuNet + SFace, `/faces/embed`, `/faces/reload`, сторінка `/persons`, події `known_person`/`stranger_detected` | Зареєстрований «свій» підписаний ім'ям, незнайомий позначений червоним «чужий» |
 | 6 | Claude: опис сцени для `stranger_detected`, знімки у Storage | У журналі подій біля чужого з'являється знімок і текстовий опис |
 | 7 | api: `RobotGateway`, `DecisionService`; fake-robot; керування з web | Людина в кадрі → fake-robot логує `alert`; кнопки керування з web доходять до fake-robot |
-| 8 | robot на Pi Zero: драйвери Freenove, автомат станів, оминання перешкод, watchdog | Справжня машинка патрулює, оминає стіни і зупиняється, коли в кадрі людина |
+| 8 | robot-bridge: LEGO Technic Hub по BLE, команди руху й керма, `hide`, watchdog, телеметрія хаба | Справжня машинка керується з web, зупиняється, коли в кадрі людина, і виконує `hide` |
 | 9 | Режим `STATIONARY`, Supabase Auth для оператора, полірування UI | Перемикання режимів працює, вхід за логіном |
 | 10 | Заміри для магістерської: FPS, затримка «кадр → стоп робота», точність свій/чужий за різних відстаней і порогів, мобільний vs стаціонарний режим | Таблиці в `docs/metrics.md` |
 
-**Паралельно з етапами 2–4 (руками):** зібрати машинку, поставити Raspberry Pi OS Lite на Zero 2W, підключити до Wi-Fi, запустити приклад Freenove і переконатися, що мотори, серво й ультразвук працюють.
+**Руками:** зібрати LEGO 42160, увімкнути хаб і перевірити порти через `cd robot-bridge && pnpm probe`.
 
 ## 14. Правила для Claude Code
 

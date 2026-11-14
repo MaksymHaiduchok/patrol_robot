@@ -10,7 +10,7 @@
 | [web](web/README.md) | Панель оператора (Next.js) | 3000 |
 | [api](api/README.md) | Диспетчер подій і команд (NestJS) | 4000 |
 | [vision](vision/README.md) | Комп'ютерний зір (FastAPI, OpenCV, YOLO) | 8001 |
-| [robot](robot/README.md) | Бортовий код для Raspberry Pi Zero 2W | — |
+| [robot-bridge](robot-bridge/README.md) | Міст api ↔ LEGO Technic Hub (42160) по Bluetooth LE (Node.js) | — |
 | [fake-robot](fake-robot/README.md) | Імітатор робота для розробки без заліза | — |
 
 ## Потрібно встановити
@@ -26,7 +26,10 @@
 cd vision && uv sync && uv run python scripts/download_models.py && uv run uvicorn main:app --reload --port 8001 --timeout-graceful-shutdown 1
 cd api && pnpm install && pnpm start:dev
 cd web && pnpm install && pnpm dev
+cd robot-bridge && pnpm install && pnpm start
 ```
+
+Для `robot-bridge` хаб має бути увімкнений, а передні колеса виставлені прямо. Порти хаба перевіряє `pnpm probe`. Папка `robot/` (Raspberry Pi + Freenove) — відкинутий варіант, див. [docs/decisions.md](docs/decisions.md).
 
 Перевірка: http://localhost:8001/health, http://localhost:4000, http://localhost:3000.
 

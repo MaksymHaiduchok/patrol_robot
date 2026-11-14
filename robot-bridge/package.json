@@ -1,0 +1,19 @@
+{
+  "name": "robot-bridge",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx --env-file-if-exists=.env src/main.ts",
+    "probe": "tsx scripts/probe.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "node-poweredup": "^10.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3"
+  }
+}
