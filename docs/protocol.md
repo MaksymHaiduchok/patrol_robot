@@ -107,11 +107,26 @@ vision надсилає подію, коли змінюється ситуаці
 - `event_created` — подію збережено в БД.
 - `event_updated` — подію змінено (оцінка оператора; з етапу 6 — опис від Claude).
 
+```json
+{ "type": "robot_status", "robot": { "robot_id": "lego-audi-01", "connected": true, "hub": "online", "state": "MANUAL", "distance_cm": null, "battery": 87 } }
+```
+
+- `robot_status` — надсилається одразу після підключення оператора і далі щоразу, коли змінюється стан робота. `connected` — чи підключений `robot-bridge` до api, `hub` — чи є в моста зв'язок із хабом. Керувати можна, коли обидва `true`/`online`.
+
+## web → api: WebSocket `/operator`
+
+```json
+{ "type": "control", "command": { "type": "command", "cmd": "move", "dir": "forward", "speed": 40 } }
+{ "type": "control", "command": { "type": "command", "cmd": "stop" } }
+```
+
+`command` — будь-яка команда робота з розділу `/robot`; api перевіряє її (невідомі відкидаються, `speed` обрізається до 0–100) і пересилає роботу. Web шле `move` при натисканні стрілки / WASD і при зміні повзунка швидкості, `stop` — при відпусканні, втраті фокуса вікна або виході з ручного режиму; перемикач «Авто/Ручне» шле `set_state` `PATROL`/`MANUAL`. Якщо оператор, який керував рухом, відключився, api шле роботу `stop`.
+
 Web при відкритті завантажує останні події через `GET /events`, далі отримує нові через WebSocket; при розриві перепідключається кожні 2 с.
 
 ## api ↔ robot: WebSocket `/robot`
 
-Робота представляє `robot-bridge` (Мак, Bluetooth LE до LEGO Technic Hub). Він підключається до `/robot` як клієнт і перепідключається кожні 2 с. Типи — `robot-bridge/src/protocol.ts`; на боці api ще не реалізовано (етап 7).
+Робота представляє `robot-bridge` (Мак, Bluetooth LE до LEGO Technic Hub). Він підключається до `/robot` як клієнт і перепідключається кожні 2 с. На боці api — `RobotGateway`; одночасно підключений один робот (нове підключення замінює старе). Типи — `api/src/protocol/protocol.ts`, `web/src/lib/protocol.ts` і копія в `robot-bridge/src/protocol.ts`.
 
 ### api → robot
 
@@ -161,4 +176,4 @@ api шле `ping` раз на секунду. Немає `ping` довше `WATC
 
 ## Ще не реалізовано
 
-Обробка `/robot` на боці api і повідомлення web → api через `/operator` (`control`, `set_mode`, `resume`) — етап 7, попередній опис у `CLAUDE.md`, розділ 10.
+`set_mode` (перемикання `PATROL`/`STATIONARY`) і `DecisionService` (автоматичні `alert`/`resume`/`hide` за подіями vision) — етап 7, попередній опис у `CLAUDE.md`, розділи 8 і 10.

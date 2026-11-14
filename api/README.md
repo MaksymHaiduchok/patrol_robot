@@ -26,7 +26,8 @@ pnpm start:dev
 - `GET /persons`, `POST /persons`, `DELETE /persons/:id` — «свої»
 - `POST /persons/:id/photos` (multipart `photos`), `POST /persons/:id/capture` — додати обличчя з файлів або з камери
 - `GET /persons/embeddings` — вектори облич для vision
-- WebSocket `ws://localhost:4000/operator` — живі події для веб-інтерфейсу
+- WebSocket `ws://localhost:4000/operator` — живі події й статус робота для веб-інтерфейсу; приймає від нього команди керування (`control`)
+- WebSocket `ws://localhost:4000/robot` — підключення робота (`robot-bridge`): команди, `ping` раз на секунду, телеметрія
 
 ## Змінні середовища
 

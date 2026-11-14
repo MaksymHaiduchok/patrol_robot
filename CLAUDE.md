@@ -257,8 +257,8 @@ Storage buckets: `snapshots` (знімки подій), `faces` (фото «св
 api шле `ping` раз на секунду, а телеметрія від робота приходить 2–5 разів на секунду.
 
 ### api ↔ web (`/operator`)
-Від api до web: `event_created`, `event_updated` (з'явився опис Claude), `robot_status` (online/offline, state, distance_cm), `system_mode` (`PATROL`/`STATIONARY`).
-Від web до api: `control` (ті самі команди, що для робота, для ручного керування), `set_mode`, `resume`.
+Від api до web: `event_created`, `event_updated` (з'явився опис Claude), `robot_status` (`connected`, `hub`, `state`, `distance_cm`, `battery`), `system_mode` (`PATROL`/`STATIONARY`).
+Від web до api: `control` (`{ "type": "control", "command": <команда робота> }` — ручне керування, стоп, resume, set_state), `set_mode`.
 
 ## 11. Робот (`robot-bridge/`)
 

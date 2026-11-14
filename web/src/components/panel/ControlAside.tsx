@@ -1,9 +1,9 @@
 "use client";
 
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Info, Play, Square } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Segmented } from "@/components/ui/Segmented";
-import type { SystemMode } from "@/lib/protocol";
+import type { RobotCommand, SystemMode } from "@/lib/protocol";
 import type { RobotStatus } from "@/lib/robot";
 import type { ControlMode, Direction } from "@/lib/types";
 
@@ -23,6 +23,7 @@ type ControlAsideProps = {
   onSystemModeChange: (mode: SystemMode) => void;
   controlMode: ControlMode;
   onControlModeChange: (mode: ControlMode) => void;
+  onControl: (command: RobotCommand) => void;
   robot: RobotStatus;
   cameraOnline: boolean;
   alarm: boolean;
@@ -65,9 +66,31 @@ function Keycap({ children }: { children: ReactNode }) {
   );
 }
 
-function ManualControls() {
+const STOP_COMMAND: RobotCommand = { type: "command", cmd: "stop" };
+
+function ManualControls({ onControl }: { onControl: (command: RobotCommand) => void }) {
   const [activeDirection, setActiveDirection] = useState<Direction | null>(null);
   const [speed, setSpeed] = useState(40);
+  const drivingRef = useRef(false);
+
+  useEffect(() => {
+    if (activeDirection) {
+      onControl({ type: "command", cmd: "move", dir: activeDirection, speed });
+      drivingRef.current = true;
+      return;
+    }
+    if (drivingRef.current) {
+      onControl(STOP_COMMAND);
+      drivingRef.current = false;
+    }
+  }, [activeDirection, speed, onControl]);
+
+  useEffect(
+    () => () => {
+      if (drivingRef.current) onControl(STOP_COMMAND);
+    },
+    [onControl],
+  );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -80,11 +103,14 @@ function ManualControls() {
     const onKeyUp = (event: KeyboardEvent) => {
       if (KEY_DIRECTIONS[event.key.toLowerCase()]) setActiveDirection(null);
     };
+    const onBlur = () => setActiveDirection(null);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
     };
   }, []);
 
@@ -141,6 +167,7 @@ export function ControlAside({
   onSystemModeChange,
   controlMode,
   onControlModeChange,
+  onControl,
   robot,
   cameraOnline,
   alarm,
@@ -209,13 +236,13 @@ export function ControlAside({
           />
           <span className="text-small text-text-muted">
             {manual
-              ? "Автопілот вимкнено. Ультразвуковий датчик усе одно зупинить робота перед перешкодою."
-              : "Робот їздить сам і оминає перешкоди. Зупиняється, коли бачить людину."}
+              ? "Керуєте ви. Датчика перешкод на машинці немає — стежте за відео."
+              : "Робот чекає на місці й реагує на людей у кадрі. Сам по території не їздить."}
           </span>
         </div>
       )}
 
-      {manual && <ManualControls />}
+      {manual && <ManualControls onControl={onControl} />}
 
       {patrol && (
         <div className="mt-auto flex flex-col gap-2.5 border-t border-border pt-3.5">
@@ -240,7 +267,9 @@ export function ControlAside({
           {offline && (
             <span className="flex items-center gap-2 text-small text-text-muted">
               <Info aria-hidden className="size-4" />
-              Робот не підключений. Увімкніть живлення машинки.
+              {robot.bridgeConnected
+                ? "Міст підключений, але хаб машинки не на зв'язку. Увімкніть хаб кнопкою."
+                : "Робот не підключений. Запустіть robot-bridge."}
             </span>
           )}
         </div>

@@ -1,16 +1,30 @@
-export type RobotState = "IDLE" | "PATROL" | "ALERT" | "MANUAL";
+import type { RobotStatus as ApiRobotStatus, RobotState } from "@/lib/protocol";
 
 export type RobotStatus = {
   id: string;
   online: boolean;
+  bridgeConnected: boolean;
   state: RobotState;
   distanceCm: number | null;
+  battery: number | null;
 };
 
-// TODO: отримувати через WebSocket /operator (robot_status), коли з'явиться RobotGateway (етап 7).
-export const ROBOT_STUB: RobotStatus = {
-  id: "freenove-01",
-  online: false,
+export function toRobotStatus(robot: ApiRobotStatus): RobotStatus {
+  return {
+    id: robot.robot_id ?? "робот",
+    online: robot.connected && robot.hub === "online",
+    bridgeConnected: robot.connected,
+    state: robot.state,
+    distanceCm: robot.distance_cm,
+    battery: robot.battery,
+  };
+}
+
+export const ROBOT_OFFLINE: RobotStatus = toRobotStatus({
+  robot_id: null,
+  connected: false,
+  hub: "offline",
   state: "IDLE",
-  distanceCm: null,
-};
+  distance_cm: null,
+  battery: null,
+});

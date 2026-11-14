@@ -12,7 +12,7 @@ import { Toast } from "@/components/ui/Toast";
 import { eventTitle, formatTime } from "@/lib/eventLabels";
 import { toFeedItem } from "@/lib/eventView";
 import type { EventRecord, SystemMode } from "@/lib/protocol";
-import { ROBOT_STUB, type RobotStatus } from "@/lib/robot";
+import type { RobotStatus } from "@/lib/robot";
 import type { ControlMode } from "@/lib/types";
 import { useNow } from "@/lib/useNow";
 import { useOperatorEvents } from "@/lib/useOperatorEvents";
@@ -105,9 +105,8 @@ export function OperatorPanel() {
   const health = useVisionHealth();
   const now = useNow();
   const { persons, names, refresh: refreshPersons } = usePersons();
-  const { events, connected, apiDown, pendingReview, applyUpdate, dismissReview, reopenReview } =
+  const { events, connected, apiDown, pendingReview, robot, sendControl, applyUpdate, dismissReview, reopenReview } =
     useOperatorEvents();
-  const robot = ROBOT_STUB;
 
   const cameraOnline = health?.source_connected ?? false;
   const fps = health?.fps ?? null;
@@ -132,9 +131,17 @@ export function OperatorPanel() {
   const cards = buildCards(cameraOnline, fps, robot, systemMode, manual, alarmActive);
   const clock = now === null ? "--:--:--" : new Date(now).toLocaleTimeString("uk-UA");
 
-  // TODO: надсилати resume/stop роботу через WebSocket /operator (етап 7).
-  const resume = () => setResumedVisitId(visit?.start.id ?? null);
-  const stop = () => undefined;
+  const resume = () => {
+    setResumedVisitId(visit?.start.id ?? null);
+    sendControl({ type: "command", cmd: "resume" });
+  };
+  const stop = () => sendControl({ type: "command", cmd: "stop" });
+
+  const changeControlMode = (mode: ControlMode) => {
+    setControlMode(mode);
+    sendControl({ type: "command", cmd: "stop" });
+    sendControl({ type: "command", cmd: "set_state", state: mode === "MANUAL" ? "MANUAL" : "PATROL" });
+  };
 
   const selectFeedItem = (id: string) => {
     const event = events.find((item) => item.id === id);
@@ -183,7 +190,8 @@ export function OperatorPanel() {
             systemMode={systemMode}
             onSystemModeChange={setSystemMode}
             controlMode={controlMode}
-            onControlModeChange={setControlMode}
+            onControlModeChange={changeControlMode}
+            onControl={sendControl}
             robot={robot}
             cameraOnline={cameraOnline}
             alarm={alarmActive}
