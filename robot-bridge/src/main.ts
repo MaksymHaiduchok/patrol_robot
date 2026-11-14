@@ -1,20 +1,44 @@
 import { Car } from "./car.js";
 import { loadConfig } from "./config.js";
 import { hideSteps } from "./hide.js";
+import { returnHome } from "./home.js";
 import { log, sleep } from "./log.js";
-import type { ApiToRobotMessage, RobotCommand, RobotState, RobotToApiMessage } from "./protocol.js";
+import { PathRecorder, type PathPoint } from "./path.js";
+import type { ApiToRobotMessage, HomeState, RobotCommand, RobotState, RobotToApiMessage } from "./protocol.js";
 
 const RECONNECT_DELAY_MS = 2000;
+const PATH_SAMPLE_MS = 20;
 
 const config = loadConfig();
 const car = new Car(config);
+const recorder = new PathRecorder();
 
 let socket: WebSocket | null = null;
 let state: RobotState = "IDLE";
 let stateBeforeAlert: RobotState = "PATROL";
 let lastPingAt = Date.now();
 let watchdogTripped = false;
-let hideRun = 0;
+let maneuverRun = 0;
+let homeVersion = 0;
+let returning = false;
+
+car.onDisconnect(() => {
+  if (recorder.hasHome) {
+    log("Дім скинуто: втрачено зв'язок з хабом, записаний шлях більше не точний");
+  }
+  homeVersion += 1;
+  recorder.clear();
+});
+
+const currentPoint = (): PathPoint => ({ odometer: car.driveDegrees(), steerAngle: car.steerAngle() ?? 0 });
+
+const recordPath = (): void => {
+  if (car.status === "online" && car.steerAngle() !== null) {
+    recorder.sample(currentPoint());
+  }
+};
+
+const homeState = (): HomeState => (returning ? "returning" : recorder.hasHome ? "recording" : "none");
 
 const send = (message: RobotToApiMessage): void => {
   if (socket?.readyState === WebSocket.OPEN) {
@@ -34,16 +58,16 @@ const setState = (next: RobotState): void => {
 };
 
 const halt = (): void => {
-  hideRun += 1;
+  maneuverRun += 1;
   car.stop();
 };
 
 const hide = async (): Promise<void> => {
-  const run = ++hideRun;
+  const run = ++maneuverRun;
 
   log("Hide: почато");
   for (const step of hideSteps(config)) {
-    if (run !== hideRun) {
+    if (run !== maneuverRun) {
       log("Hide: перервано");
       return;
     }
@@ -52,10 +76,39 @@ const hide = async (): Promise<void> => {
     car.drive(step.power);
     await sleep(step.ms);
   }
-  if (run === hideRun) {
+  if (run === maneuverRun) {
     car.stop();
     setState("ALERT");
     log("Hide: завершено, чекаю в ALERT");
+  }
+};
+
+const setHome = (): void => {
+  maneuverRun += 1;
+  homeVersion += 1;
+  car.brakeDrive();
+  recorder.begin(currentPoint());
+  log("Дім: точку зафіксовано, записую шлях");
+};
+
+const goHome = async (): Promise<void> => {
+  const run = ++maneuverRun;
+  const version = homeVersion;
+  returning = true;
+  const path = recorder.take(currentPoint());
+  const result = await returnHome(car, config, path, () => run !== maneuverRun);
+  returning = false;
+  if (version !== homeVersion) {
+    return;
+  }
+  recorder.resume(result.remaining);
+  if (result.reason === "home") {
+    log("Додому: прибули, шлях записується заново від дому");
+  } else if (result.reason === "stalled") {
+    car.stop();
+    log("Додому: колеса не крутяться (застряг?), зупинено; недопройдений шлях збережено");
+  } else {
+    log("Додому: перервано, недопройдений шлях збережено");
   }
 };
 
@@ -68,7 +121,7 @@ const handleCommand = (command: RobotCommand): void => {
 
   switch (command.cmd) {
     case "move":
-      hideRun += 1;
+      maneuverRun += 1;
       if (command.dir === "left" || command.dir === "right") {
         car.steer(command.dir);
       } else if (command.speed === 0) {
@@ -78,11 +131,11 @@ const handleCommand = (command: RobotCommand): void => {
       }
       break;
     case "turn":
-      hideRun += 1;
+      maneuverRun += 1;
       car.steer(command.dir === "left" || command.dir === "right" ? command.dir : null);
       break;
     case "steer":
-      hideRun += 1;
+      maneuverRun += 1;
       car.steer(command.dir === "center" ? null : command.dir);
       break;
     case "stop":
@@ -109,6 +162,20 @@ const handleCommand = (command: RobotCommand): void => {
       break;
     case "hide":
       void hide();
+      break;
+    case "set_home":
+      setHome();
+      break;
+    case "return_home":
+      if (!recorder.hasHome) {
+        log("Додому: точку дому не зафіксовано");
+        return;
+      }
+      if (returning) {
+        log("Додому: уже повертаюсь");
+        return;
+      }
+      void goHome();
       break;
   }
   ack(command.cmd);
@@ -180,6 +247,7 @@ const sendTelemetry = (): void => {
     distance_cm: null,
     hub: car.status,
     battery: car.battery,
+    home: homeState(),
     ts: Date.now(),
   });
 };
@@ -199,4 +267,5 @@ log(`robot-bridge ${config.robotId}: хід ${config.drivePorts.join(",")}, ке
 await car.start();
 connect();
 setInterval(checkWatchdog, 200);
+setInterval(recordPath, PATH_SAMPLE_MS);
 setInterval(sendTelemetry, config.telemetryIntervalMs);

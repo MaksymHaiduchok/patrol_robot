@@ -6,6 +6,8 @@ export type SteerDirection = "left" | "right" | "center";
 
 export type HubStatus = "online" | "offline";
 
+export type HomeState = "none" | "recording" | "returning";
+
 export type RobotCommand =
   | { type: "command"; cmd: "move"; dir: Direction; speed: number }
   | { type: "command"; cmd: "turn"; dir: Direction; speed: number }
@@ -15,7 +17,9 @@ export type RobotCommand =
   | { type: "command"; cmd: "set_state"; state: RobotState }
   | { type: "command"; cmd: "alert" }
   | { type: "command"; cmd: "resume" }
-  | { type: "command"; cmd: "hide" };
+  | { type: "command"; cmd: "hide" }
+  | { type: "command"; cmd: "set_home" }
+  | { type: "command"; cmd: "return_home" };
 
 export type ApiToRobotMessage = RobotCommand | { type: "ping"; ts: number };
 
@@ -27,6 +31,7 @@ export type RobotToApiMessage =
       distance_cm: number | null;
       hub: HubStatus;
       battery: number | null;
+      home: HomeState;
       ts: number;
     }
   | { type: "pong"; ts: number }

@@ -22,6 +22,7 @@ const OFFLINE_STATUS: RobotStatus = {
   state: 'IDLE',
   distance_cm: null,
   battery: null,
+  home: 'none',
 };
 
 type StatusListener = (status: RobotStatus) => void;
@@ -119,6 +120,7 @@ export class RobotGateway
           state: message.state,
           distance_cm: message.distance_cm,
           battery: message.battery,
+          home: message.home,
         });
         break;
       case 'ack':
@@ -133,13 +135,18 @@ export class RobotGateway
 
   private updateStatus(next: RobotStatus): void {
     const changed = JSON.stringify(next) !== JSON.stringify(this.status);
+    const batteryOnly =
+      JSON.stringify({ ...next, battery: null }) ===
+      JSON.stringify({ ...this.status, battery: null });
     this.status = next;
     if (!changed) {
       return;
     }
-    this.logger.log(
-      `robot status: connected=${next.connected} hub=${next.hub} state=${next.state} battery=${next.battery ?? '-'}`,
-    );
+    if (!batteryOnly) {
+      this.logger.log(
+        `robot status: connected=${next.connected} hub=${next.hub} state=${next.state} home=${next.home} battery=${next.battery ?? '-'}`,
+      );
+    }
     for (const listener of this.statusListeners) {
       listener(next);
     }

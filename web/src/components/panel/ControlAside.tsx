@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Info, Play, Square } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, House, Info, MapPin, Play, Square } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/Segmented";
-import type { RobotCommand, SystemMode } from "@/lib/protocol";
+import type { HomeState, RobotCommand, SystemMode } from "@/lib/protocol";
 import type { RobotStatus } from "@/lib/robot";
 import type { ControlMode, Direction } from "@/lib/types";
 
@@ -69,6 +70,46 @@ function Keycap({ children }: { children: ReactNode }) {
 }
 
 const STOP_COMMAND: RobotCommand = { type: "command", cmd: "stop" };
+
+const HOME_HINTS: Record<HomeState, string> = {
+  none: "Зафіксуйте точку — машинка почне записувати шлях і зможе сама повернутися сюди.",
+  recording: "Шлях записується. «Додому» поверне машинку тим самим шляхом у зворотному напрямку.",
+  returning: "Машинка повертається додому. Стрілка або «Стоп» перерве повернення.",
+};
+
+type HomeControlsProps = {
+  home: HomeState;
+  disabled: boolean;
+  onControl: (command: RobotCommand) => void;
+};
+
+function HomeControls({ home, disabled, onControl }: HomeControlsProps) {
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-heading font-semibold">Дім</span>
+      <div className="grid grid-cols-2 gap-2">
+        <Button
+          icon={<MapPin aria-hidden className="size-4" />}
+          disabled={disabled || home === "returning"}
+          onClick={() => onControl({ type: "command", cmd: "set_home" })}
+        >
+          {home === "none" ? "Зафіксувати" : "Заново"}
+        </Button>
+        <Button
+          variant="primary"
+          icon={<House aria-hidden className="size-4" />}
+          disabled={disabled || home !== "recording"}
+          loading={home === "returning"}
+          loadingText="Їде додому"
+          onClick={() => onControl({ type: "command", cmd: "return_home" })}
+        >
+          Додому
+        </Button>
+      </div>
+      <span className="text-small text-text-muted">{HOME_HINTS[home]}</span>
+    </div>
+  );
+}
 
 function ManualControls({ onControl }: { onControl: (command: RobotCommand) => void }) {
   const [drive, setDrive] = useState<DriveDirection | null>(null);
@@ -268,6 +309,8 @@ export function ControlAside({
       )}
 
       {manual && <ManualControls onControl={onControl} />}
+
+      {patrol && <HomeControls home={robot.home} disabled={offline} onControl={onControl} />}
 
       {patrol && (
         <div className="mt-auto flex flex-col gap-2.5 border-t border-border pt-3.5">

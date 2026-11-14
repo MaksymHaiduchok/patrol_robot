@@ -21,6 +21,15 @@ export type Config = {
     forwardSpeed: number;
     forwardMs: number;
   };
+  returnHome: {
+    speed: number;
+    slowSpeed: number;
+    slowZoneDegrees: number;
+    steerTimeoutMs: number;
+    stallMs: number;
+    toleranceDegrees: number;
+    steerLookaheadDegrees: number;
+  };
 };
 
 const PORT_NAMES = ["A", "B", "C", "D"];
@@ -102,5 +111,14 @@ export const loadConfig = (): Config => ({
     turnMs: readNumber("HIDE_TURN_MS", 1500),
     forwardSpeed: readNumber("HIDE_FORWARD_SPEED", 50),
     forwardMs: readNumber("HIDE_FORWARD_MS", 1500),
+  },
+  returnHome: {
+    speed: readNumber("RETURN_SPEED", 40),
+    slowSpeed: readNumber("RETURN_SLOW_SPEED", 20),
+    slowZoneDegrees: readNumber("RETURN_SLOW_ZONE_DEGREES", 120),
+    steerTimeoutMs: readNumber("RETURN_STEER_TIMEOUT_MS", 1500),
+    stallMs: readNumber("RETURN_STALL_MS", 1500),
+    toleranceDegrees: readNumber("RETURN_TOLERANCE_DEGREES", 10),
+    steerLookaheadDegrees: readNumber("RETURN_STEER_LOOKAHEAD_DEGREES", 45),
   },
 });

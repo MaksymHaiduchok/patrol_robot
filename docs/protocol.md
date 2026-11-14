@@ -108,7 +108,7 @@ vision надсилає подію, коли змінюється ситуаці
 - `event_updated` — подію змінено (оцінка оператора; з етапу 6 — опис від Claude).
 
 ```json
-{ "type": "robot_status", "robot": { "robot_id": "lego-audi-01", "connected": true, "hub": "online", "state": "MANUAL", "distance_cm": null, "battery": 87 } }
+{ "type": "robot_status", "robot": { "robot_id": "lego-audi-01", "connected": true, "hub": "online", "state": "MANUAL", "distance_cm": null, "battery": 87, "home": "recording" } }
 ```
 
 - `robot_status` — надсилається одразу після підключення оператора і далі щоразу, коли змінюється стан робота. `connected` — чи підключений `robot-bridge` до api, `hub` — чи є в моста зв'язок із хабом. Керувати можна, коли обидва `true`/`online`.
@@ -139,6 +139,8 @@ Web при відкритті завантажує останні події ч�
 { "type": "command", "cmd": "alert" }
 { "type": "command", "cmd": "resume" }
 { "type": "command", "cmd": "hide" }
+{ "type": "command", "cmd": "set_home" }
+{ "type": "command", "cmd": "return_home" }
 { "type": "command", "cmd": "servo", "pan": 90, "tilt": 90 }
 { "type": "ping", "ts": 1731050000000 }
 ```
@@ -153,6 +155,8 @@ Web при відкритті завантажує останні події ч�
 | `alert` | стоп і стан `ALERT` |
 | `resume` | повернути стан, що був до `alert` |
 | `hide` | маневр за часом: назад → поворот → вперед (параметри в `.env` моста), далі стоп і `ALERT`; переривається будь-якою командою руху, `stop`, `alert` або watchdog |
+| `set_home` | зафіксувати поточну точку як дім і почати запис шляху (повторний виклик — новий дім, старий шлях стирається) |
+| `return_home` | повернутися додому записаним шляхом: їде точками шляху у зворотному порядку без зупинок, виставляючи кермо так, як воно стояло в цьому місці, і зупиняється лише там, де під час запису змінювався напрям руху, і вдома. Ігнорується без `ack`, якщо дім не задано або повернення вже йде; переривається так само, як `hide` (недопройдений шлях зберігається, можна продовжити), а якщо колеса не крутяться `RETURN_STALL_MS` — зупинка. Після прибуття шлях пишеться заново від того самого дому |
 | `servo` | не підтримується, ігнорується без `ack` |
 
 `dir`: `forward` \| `backward` \| `left` \| `right`. `speed`: 0–100. `state`: `IDLE` \| `PATROL` \| `ALERT` \| `MANUAL`.
@@ -162,7 +166,7 @@ api шле `ping` раз на секунду. Немає `ping` довше `WATC
 
 ```json
 { "type": "hello", "robot_id": "lego-audi-01" }
-{ "type": "telemetry", "state": "PATROL", "distance_cm": null, "hub": "online", "battery": 87, "ts": 1731050000000 }
+{ "type": "telemetry", "state": "PATROL", "distance_cm": null, "hub": "online", "battery": 87, "home": "recording", "ts": 1731050000000 }
 { "type": "pong", "ts": 1731050000000 }
 { "type": "ack", "cmd": "alert", "ts": 1731050000000 }
 ```
@@ -173,6 +177,7 @@ api шле `ping` раз на секунду. Немає `ping` довше `WATC
 | `distance_cm` | відстань до перешкоди; на 42160 датчика немає — завжди `null` |
 | `hub` | `online` \| `offline` — зв'язок моста з Technic Hub по Bluetooth |
 | `battery` | заряд хаба, %; `null`, коли хаб offline |
+| `home` | `none` — дім не задано; `recording` — дім задано, шлях пишеться; `returning` — повертається додому. Втрата зв'язку з хабом скидає дім у `none` |
 
 Телеметрія йде кожні 300 мс. `pong` повертає `ts` з `ping` (для заміру затримки). `ack` — команду виконано; поки хаб offline, команди (крім `set_state`) ігноруються без `ack`.
 

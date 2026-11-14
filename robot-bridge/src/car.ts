@@ -47,6 +47,7 @@ export class Car {
   private steerCalibration: SteerCalibration | null = null;
   private connected = false;
   private readonly degrees = new Map<string, number>();
+  private disconnectListener: (() => void) | null = null;
 
   constructor(private readonly config: Config) {}
 
@@ -60,6 +61,18 @@ export class Car {
 
   get steerLimit(): number | null {
     return this.steerCalibration?.limit ?? null;
+  }
+
+  onDisconnect(listener: () => void): void {
+    this.disconnectListener = listener;
+  }
+
+  driveDegrees(): number {
+    if (this.driveMotors.length === 0) {
+      return 0;
+    }
+    const total = this.driveMotors.reduce((sum, { port, sign }) => sum + sign * (this.degrees.get(port) ?? 0), 0);
+    return total / this.driveMotors.length;
   }
 
   async start(): Promise<void> {
@@ -77,15 +90,19 @@ export class Car {
   }
 
   readings(): MotorReadings {
-    const steerDegrees = this.degrees.get(this.config.steerPort);
-    const steerSign = this.config.steerInverted ? -1 : 1;
     return {
       drive: this.driveMotors.map(({ port, sign }) => ({ port, degrees: sign * (this.degrees.get(port) ?? 0) })),
-      steer:
-        this.steerCalibration && steerDegrees !== undefined
-          ? steerSign * (steerDegrees - this.steerCalibration.center)
-          : null,
+      steer: this.steerAngle(),
     };
+  }
+
+  steerAngle(): number | null {
+    const steerDegrees = this.degrees.get(this.config.steerPort);
+    if (!this.steerCalibration || steerDegrees === undefined) {
+      return null;
+    }
+    const sign = this.config.steerInverted ? -1 : 1;
+    return sign * (steerDegrees - this.steerCalibration.center);
   }
 
   drive(power: number): void {
@@ -95,13 +112,18 @@ export class Car {
   }
 
   steer(side: SteerSide | null): void {
+    const limit = this.steerCalibration?.limit ?? 0;
+    this.steerTo(side === null ? 0 : side === "left" ? -limit : limit);
+  }
+
+  steerTo(angle: number): void {
     if (!this.steerMotor || !this.steerCalibration) {
       return;
     }
     const { center, limit } = this.steerCalibration;
-    const direction = side === null ? 0 : side === "left" ? -1 : 1;
+    const clamped = Math.max(-limit, Math.min(limit, angle));
     const sign = this.config.steerInverted ? -1 : 1;
-    this.writeGotoPosition(this.steerMotor, center + direction * sign * limit, this.config.steerSpeed);
+    this.writeGotoPosition(this.steerMotor, center + sign * clamped, this.config.steerSpeed);
   }
 
   brakeDrive(): void {
@@ -227,6 +249,7 @@ export class Car {
     this.steerMotor = null;
     this.steerCalibration = null;
     this.degrees.clear();
+    this.disconnectListener?.();
     void this.poweredUP.scan();
   }
 

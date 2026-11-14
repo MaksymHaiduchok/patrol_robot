@@ -1,4 +1,4 @@
-import type { RobotStatus as ApiRobotStatus, RobotState } from "@/lib/protocol";
+import type { RobotStatus as ApiRobotStatus, HomeState, RobotState } from "@/lib/protocol";
 
 export type RobotStatus = {
   id: string;
@@ -7,6 +7,7 @@ export type RobotStatus = {
   state: RobotState;
   distanceCm: number | null;
   battery: number | null;
+  home: HomeState;
 };
 
 export function toRobotStatus(robot: ApiRobotStatus): RobotStatus {
@@ -17,6 +18,7 @@ export function toRobotStatus(robot: ApiRobotStatus): RobotStatus {
     state: robot.state,
     distanceCm: robot.distance_cm,
     battery: robot.battery,
+    home: robot.home,
   };
 }
 
@@ -27,4 +29,5 @@ export const ROBOT_OFFLINE: RobotStatus = toRobotStatus({
   state: "IDLE",
   distance_cm: null,
   battery: null,
+  home: "none",
 });

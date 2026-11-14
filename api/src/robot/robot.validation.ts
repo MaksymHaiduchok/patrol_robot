@@ -1,5 +1,6 @@
 import type { RawData } from 'ws';
 import type {
+  HomeState,
   HubStatus,
   RobotCommand,
   RobotDirection,
@@ -14,6 +15,8 @@ const DIRECTIONS: RobotDirection[] = ['forward', 'backward', 'left', 'right'];
 
 const STEER_DIRECTIONS: SteerDirection[] = ['left', 'right', 'center'];
 
+const HOME_STATES: HomeState[] = ['none', 'recording', 'returning'];
+
 const HUB_STATUSES: HubStatus[] = ['online', 'offline'];
 
 const COMMANDS: RobotCommand['cmd'][] = [
@@ -26,6 +29,8 @@ const COMMANDS: RobotCommand['cmd'][] = [
   'alert',
   'resume',
   'hide',
+  'set_home',
+  'return_home',
 ];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -39,6 +44,9 @@ const isDirection = (value: unknown): value is RobotDirection =>
 
 const isSteerDirection = (value: unknown): value is SteerDirection =>
   STEER_DIRECTIONS.some((direction) => direction === value);
+
+const isHomeState = (value: unknown): value is HomeState =>
+  HOME_STATES.some((state) => state === value);
 
 const isHubStatus = (value: unknown): value is HubStatus =>
   HUB_STATUSES.some((status) => status === value);
@@ -97,6 +105,8 @@ export const parseRobotCommand = (value: unknown): RobotCommand | null => {
     case 'alert':
     case 'resume':
     case 'hide':
+    case 'set_home':
+    case 'return_home':
       return { type: 'command', cmd };
   }
 };
@@ -106,7 +116,8 @@ export const parseRobotMessage = (raw: string): RobotToApiMessage | null => {
   if (!isRecord(message)) {
     return null;
   }
-  const { type, robot_id, state, distance_cm, hub, battery, ts, cmd } = message;
+  const { type, robot_id, state, distance_cm, hub, battery, home, ts, cmd } =
+    message;
 
   switch (type) {
     case 'hello':
@@ -116,8 +127,9 @@ export const parseRobotMessage = (raw: string): RobotToApiMessage | null => {
         isNullableNumber(distance_cm) &&
         isHubStatus(hub) &&
         isNullableNumber(battery) &&
+        isHomeState(home) &&
         typeof ts === 'number'
-        ? { type, state, distance_cm, hub, battery, ts }
+        ? { type, state, distance_cm, hub, battery, home, ts }
         : null;
     case 'pong':
       return typeof ts === 'number' ? { type, ts } : null;
