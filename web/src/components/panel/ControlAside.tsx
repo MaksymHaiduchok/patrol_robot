@@ -25,6 +25,7 @@ type ControlAsideProps = {
   controlMode: ControlMode;
   onControlModeChange: (mode: ControlMode) => void;
   onControl: (command: RobotCommand) => void;
+  onSetHome: () => void;
   robot: RobotStatus;
   alarm: boolean;
   onStop: () => void;
@@ -80,10 +81,11 @@ const HOME_HINTS: Record<HomeState, string> = {
 type HomeControlsProps = {
   home: HomeState;
   disabled: boolean;
+  onSetHome: () => void;
   onControl: (command: RobotCommand) => void;
 };
 
-function HomeControls({ home, disabled, onControl }: HomeControlsProps) {
+function HomeControls({ home, disabled, onSetHome, onControl }: HomeControlsProps) {
   return (
     <div className="flex flex-col gap-2">
       <span className="text-heading font-semibold">Дім</span>
@@ -91,7 +93,7 @@ function HomeControls({ home, disabled, onControl }: HomeControlsProps) {
         <Button
           icon={<MapPin aria-hidden className="size-4" />}
           disabled={disabled || home === "returning"}
-          onClick={() => onControl({ type: "command", cmd: "set_home" })}
+          onClick={onSetHome}
         >
           {home === "none" ? "Зафіксувати" : "Заново"}
         </Button>
@@ -236,6 +238,7 @@ export function ControlAside({
   controlMode,
   onControlModeChange,
   onControl,
+  onSetHome,
   robot,
   alarm,
   onStop,
@@ -310,7 +313,7 @@ export function ControlAside({
 
       {manual && <ManualControls onControl={onControl} />}
 
-      {patrol && <HomeControls home={robot.home} disabled={offline} onControl={onControl} />}
+      {patrol && <HomeControls home={robot.home} disabled={offline} onSetHome={onSetHome} onControl={onControl} />}
 
       {patrol && (
         <div className="mt-auto flex flex-col gap-2.5 border-t border-border pt-3.5">

@@ -36,8 +36,9 @@ type Visit = {
 };
 
 type ToastState = {
+  id: number;
   message: string;
-  event: EventRecord;
+  event: EventRecord | null;
 };
 
 function findActiveVisit(events: EventRecord[], names: Map<string, string>): Visit | null {
@@ -137,6 +138,18 @@ export function OperatorPanel() {
   };
   const stop = () => sendControl({ type: "command", cmd: "stop" });
 
+  const setHome = () => {
+    sendControl({ type: "command", cmd: "set_home" });
+    setToast({
+      id: Date.now(),
+      message:
+        robot.home === "none"
+          ? "Точку дому зафіксовано — шлях записується звідси"
+          : "Точку дому оновлено — старий шлях стерто, запис почато звідси",
+      event: null,
+    });
+  };
+
   const changeControlMode = (mode: ControlMode) => {
     setControlMode(mode);
     sendControl({ type: "command", cmd: "stop" });
@@ -152,7 +165,7 @@ export function OperatorPanel() {
   const markedStranger = useCallback(
     (event: EventRecord) => {
       applyUpdate(event);
-      setToast({ message: "Позначено як «Чужий (оператор)»", event });
+      setToast({ id: Date.now(), message: "Позначено як «Чужий (оператор)»", event });
     },
     [applyUpdate],
   );
@@ -192,6 +205,7 @@ export function OperatorPanel() {
             controlMode={controlMode}
             onControlModeChange={changeControlMode}
             onControl={sendControl}
+            onSetHome={setHome}
             robot={robot}
             alarm={alarmActive}
             onStop={stop}
@@ -221,10 +235,11 @@ export function OperatorPanel() {
 
       {toast && (
         <Toast
+          key={toast.id}
           message={toast.message}
-          actionLabel="Скасувати"
+          actionLabel={toast.event ? "Скасувати" : undefined}
           onAction={() => {
-            reopenReview(toast.event);
+            if (toast.event) reopenReview(toast.event);
             setToast(null);
           }}
           onClose={closeToast}

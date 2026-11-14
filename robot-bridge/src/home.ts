@@ -8,6 +8,7 @@ const BRAKE_SETTLE_MS = 250;
 const STEER_TOLERANCE_DEGREES = 5;
 const STEER_UPDATE_DEGREES = 2;
 const CORRECTION_ATTEMPTS = 2;
+const VELOCITY_SMOOTHING = 0.3;
 
 type StopReason = "done" | "cancelled" | "stalled";
 
@@ -58,10 +59,13 @@ const driveTo = async (
   steerAt: (odometer: number) => number,
   isCancelled: () => boolean,
 ): Promise<StopReason> => {
-  const { slowSpeed, slowZoneDegrees, stallMs } = config.returnHome;
+  const { slowSpeed, slowZoneDegrees, stallMs, steerLookaheadMs } = config.returnHome;
   const direction = Math.sign(target - car.driveDegrees());
   let lastOdometer = car.driveDegrees();
   let lastProgressAt = Date.now();
+  let previousOdometer = lastOdometer;
+  let previousAt = Date.now();
+  let velocity = 0;
   let power = 0;
   let steer = Number.NaN;
   let reason: StopReason = "done";
@@ -72,6 +76,13 @@ const driveTo = async (
       break;
     }
     const odometer = car.driveDegrees();
+    const now = Date.now();
+    if (now > previousAt) {
+      const instant = ((odometer - previousOdometer) / (now - previousAt)) * 1000;
+      velocity += (instant - velocity) * VELOCITY_SMOOTHING;
+      previousOdometer = odometer;
+      previousAt = now;
+    }
     const left = target - odometer;
     if (direction === 0 || direction * left <= 0) {
       break;
@@ -83,7 +94,8 @@ const driveTo = async (
       reason = "stalled";
       break;
     }
-    const nextSteer = steerAt(odometer + direction * config.returnHome.steerLookaheadDegrees);
+    const lookahead = (Math.abs(velocity) * steerLookaheadMs) / 1000;
+    const nextSteer = steerAt(odometer + direction * lookahead);
     if (Number.isNaN(steer) || Math.abs(nextSteer - steer) >= STEER_UPDATE_DEGREES) {
       steer = nextSteer;
       car.steerTo(steer);
