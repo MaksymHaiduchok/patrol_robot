@@ -5,17 +5,21 @@ import type {
   RobotDirection,
   RobotState,
   RobotToApiMessage,
+  SteerDirection,
 } from '../protocol/protocol.js';
 
 const ROBOT_STATES: RobotState[] = ['IDLE', 'PATROL', 'ALERT', 'MANUAL'];
 
 const DIRECTIONS: RobotDirection[] = ['forward', 'backward', 'left', 'right'];
 
+const STEER_DIRECTIONS: SteerDirection[] = ['left', 'right', 'center'];
+
 const HUB_STATUSES: HubStatus[] = ['online', 'offline'];
 
 const COMMANDS: RobotCommand['cmd'][] = [
   'move',
   'turn',
+  'steer',
   'stop',
   'servo',
   'set_state',
@@ -32,6 +36,9 @@ const isRobotState = (value: unknown): value is RobotState =>
 
 const isDirection = (value: unknown): value is RobotDirection =>
   DIRECTIONS.some((direction) => direction === value);
+
+const isSteerDirection = (value: unknown): value is SteerDirection =>
+  STEER_DIRECTIONS.some((direction) => direction === value);
 
 const isHubStatus = (value: unknown): value is HubStatus =>
   HUB_STATUSES.some((status) => status === value);
@@ -78,6 +85,8 @@ export const parseRobotCommand = (value: unknown): RobotCommand | null => {
         dir,
         speed: Math.max(0, Math.min(100, Math.round(speed))),
       };
+    case 'steer':
+      return isSteerDirection(dir) ? { type: 'command', cmd, dir } : null;
     case 'set_state':
       return isRobotState(state) ? { type: 'command', cmd, state } : null;
     case 'servo':

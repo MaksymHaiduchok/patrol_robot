@@ -236,6 +236,7 @@ Storage buckets: `snapshots` (знімки подій), `faces` (фото «св
 ```json
 { "type": "command", "cmd": "move", "dir": "forward", "speed": 40 }
 { "type": "command", "cmd": "turn", "dir": "left", "speed": 40 }
+{ "type": "command", "cmd": "steer", "dir": "left" }
 { "type": "command", "cmd": "stop" }
 { "type": "command", "cmd": "servo", "pan": 90, "tilt": 90 }
 { "type": "command", "cmd": "set_state", "state": "PATROL" }
@@ -265,7 +266,7 @@ api шле `ping` раз на секунду, а телеметрія від р�
 Процес на Маку, який для api виглядає як робот (WebSocket `/robot`), а моторами хаба керує по Bluetooth LE через `node-poweredup`. Порти й параметри — в `.env`. Під час підключення міст калібрує кермо: шукає лівий і правий упори й рахує центр. Команди моторам шлються напряму в хаб, без черги `node-poweredup`.
 
 ### Команди
-- `move forward/backward` — кермо прямо, хід ±`speed`%; `move left/right` і `turn left/right` — кермо в бік на `STEER_LIMIT_PERCENT`% від повного вивороту і хід вперед (машина не розвертається на місці).
+- Хід і кермо незалежні: `move forward/backward` — лише хід ±`speed`% (`speed: 0` — гальмо); `steer left/right/center` — лише кермо (`STEER_LIMIT_PERCENT`% від повного вивороту або центр); `move`/`turn` `left`/`right` — те саме, що `steer`. У web ↑↓ — хід, ←→ — кермо, їх можна тримати разом.
 - `stop` — гальмо, кермо прямо. `alert` — те саме і стан `ALERT`; `resume` повертає стан, що був до `alert`.
 - `hide` — маневр за часом (назад → поворот → вперед), далі стоп і `ALERT`. Будь-яка інша команда руху, `stop`, `alert` або watchdog його перериває.
 

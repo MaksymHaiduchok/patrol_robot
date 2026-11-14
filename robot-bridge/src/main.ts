@@ -69,23 +69,21 @@ const handleCommand = (command: RobotCommand): void => {
   switch (command.cmd) {
     case "move":
       hideRun += 1;
-      if (command.dir === "forward" || command.dir === "backward") {
-        car.steer(null);
-        car.drive(command.dir === "forward" ? command.speed : -command.speed);
-      } else {
+      if (command.dir === "left" || command.dir === "right") {
         car.steer(command.dir);
-        car.drive(command.speed);
+      } else if (command.speed === 0) {
+        car.brakeDrive();
+      } else {
+        car.drive(command.dir === "forward" ? command.speed : -command.speed);
       }
       break;
     case "turn":
       hideRun += 1;
-      if (command.dir === "left" || command.dir === "right") {
-        car.steer(command.dir);
-        car.drive(command.speed);
-      } else {
-        car.steer(null);
-        car.drive(command.dir === "forward" ? command.speed : -command.speed);
-      }
+      car.steer(command.dir === "left" || command.dir === "right" ? command.dir : null);
+      break;
+    case "steer":
+      hideRun += 1;
+      car.steer(command.dir === "center" ? null : command.dir);
       break;
     case "stop":
       halt();

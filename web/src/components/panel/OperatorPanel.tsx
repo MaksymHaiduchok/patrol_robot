@@ -193,7 +193,6 @@ export function OperatorPanel() {
             onControlModeChange={changeControlMode}
             onControl={sendControl}
             robot={robot}
-            cameraOnline={cameraOnline}
             alarm={alarmActive}
             onStop={stop}
             onResume={resume}

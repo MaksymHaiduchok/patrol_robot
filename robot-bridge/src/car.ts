@@ -104,10 +104,14 @@ export class Car {
     this.writeGotoPosition(this.steerMotor, center + direction * sign * limit, this.config.steerSpeed);
   }
 
-  stop(): void {
+  brakeDrive(): void {
     for (const { motor } of this.driveMotors) {
       this.writePower(motor, BRAKE_POWER);
     }
+  }
+
+  stop(): void {
+    this.brakeDrive();
     this.steer(null);
   }
 

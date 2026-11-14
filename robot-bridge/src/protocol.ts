@@ -2,11 +2,14 @@ export type RobotState = "IDLE" | "PATROL" | "ALERT" | "MANUAL";
 
 export type Direction = "forward" | "backward" | "left" | "right";
 
+export type SteerDirection = "left" | "right" | "center";
+
 export type HubStatus = "online" | "offline";
 
 export type RobotCommand =
   | { type: "command"; cmd: "move"; dir: Direction; speed: number }
   | { type: "command"; cmd: "turn"; dir: Direction; speed: number }
+  | { type: "command"; cmd: "steer"; dir: SteerDirection }
   | { type: "command"; cmd: "stop" }
   | { type: "command"; cmd: "servo"; pan: number; tilt: number }
   | { type: "command"; cmd: "set_state"; state: RobotState }

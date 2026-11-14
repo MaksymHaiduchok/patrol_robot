@@ -69,7 +69,11 @@ export class OperatorGateway
       return;
     }
     const { command } = message;
-    if (command.cmd === 'move' || command.cmd === 'turn') {
+    if (
+      command.cmd === 'move' ||
+      command.cmd === 'turn' ||
+      command.cmd === 'steer'
+    ) {
       this.drivingClients.add(client);
     } else if (command.cmd === 'stop') {
       this.drivingClients.delete(client);

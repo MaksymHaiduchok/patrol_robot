@@ -25,30 +25,32 @@ type ControlAsideProps = {
   onControlModeChange: (mode: ControlMode) => void;
   onControl: (command: RobotCommand) => void;
   robot: RobotStatus;
-  cameraOnline: boolean;
   alarm: boolean;
   onStop: () => void;
   onResume: () => void;
 };
 
+type DriveDirection = "forward" | "backward";
+
+type SteerSide = "left" | "right";
+
 type PadButtonProps = {
-  direction: Direction;
   label: string;
   icon: ReactNode;
   active: boolean;
-  onPress: (direction: Direction | null) => void;
+  onPress: (pressed: boolean) => void;
   className: string;
 };
 
-function PadButton({ direction, label, icon, active, onPress, className }: PadButtonProps) {
+function PadButton({ label, icon, active, onPress, className }: PadButtonProps) {
   return (
     <button
       type="button"
       aria-label={label}
       aria-pressed={active}
-      onPointerDown={() => onPress(direction)}
-      onPointerUp={() => onPress(null)}
-      onPointerLeave={() => active && onPress(null)}
+      onPointerDown={() => onPress(true)}
+      onPointerUp={() => onPress(false)}
+      onPointerLeave={() => active && onPress(false)}
       className={`inline-flex items-center justify-center rounded-[10px] ${className} ${
         active
           ? "bg-accent text-accent-on ring-[3px] ring-accent/35"
@@ -69,25 +71,47 @@ function Keycap({ children }: { children: ReactNode }) {
 const STOP_COMMAND: RobotCommand = { type: "command", cmd: "stop" };
 
 function ManualControls({ onControl }: { onControl: (command: RobotCommand) => void }) {
-  const [activeDirection, setActiveDirection] = useState<Direction | null>(null);
+  const [drive, setDrive] = useState<DriveDirection | null>(null);
+  const [steer, setSteer] = useState<SteerSide | null>(null);
   const [speed, setSpeed] = useState(40);
   const drivingRef = useRef(false);
+  const steeringRef = useRef(false);
+
+  const press = (direction: Direction, pressed: boolean) => {
+    if (direction === "forward" || direction === "backward") {
+      setDrive((current) => (pressed ? direction : current === direction ? null : current));
+    } else {
+      setSteer((current) => (pressed ? direction : current === direction ? null : current));
+    }
+  };
 
   useEffect(() => {
-    if (activeDirection) {
-      onControl({ type: "command", cmd: "move", dir: activeDirection, speed });
+    if (drive) {
+      onControl({ type: "command", cmd: "move", dir: drive, speed });
       drivingRef.current = true;
       return;
     }
     if (drivingRef.current) {
-      onControl(STOP_COMMAND);
+      onControl({ type: "command", cmd: "move", dir: "forward", speed: 0 });
       drivingRef.current = false;
     }
-  }, [activeDirection, speed, onControl]);
+  }, [drive, speed, onControl]);
+
+  useEffect(() => {
+    if (steer) {
+      onControl({ type: "command", cmd: "steer", dir: steer });
+      steeringRef.current = true;
+      return;
+    }
+    if (steeringRef.current) {
+      onControl({ type: "command", cmd: "steer", dir: "center" });
+      steeringRef.current = false;
+    }
+  }, [steer, onControl]);
 
   useEffect(
     () => () => {
-      if (drivingRef.current) onControl(STOP_COMMAND);
+      if (drivingRef.current || steeringRef.current) onControl(STOP_COMMAND);
     },
     [onControl],
   );
@@ -98,12 +122,16 @@ function ManualControls({ onControl }: { onControl: (command: RobotCommand) => v
       const direction = KEY_DIRECTIONS[event.key.toLowerCase()];
       if (!direction) return;
       event.preventDefault();
-      setActiveDirection(direction);
+      press(direction, true);
     };
     const onKeyUp = (event: KeyboardEvent) => {
-      if (KEY_DIRECTIONS[event.key.toLowerCase()]) setActiveDirection(null);
+      const direction = KEY_DIRECTIONS[event.key.toLowerCase()];
+      if (direction) press(direction, false);
     };
-    const onBlur = () => setActiveDirection(null);
+    const onBlur = () => {
+      setDrive(null);
+      setSteer(null);
+    };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("blur", onBlur);
@@ -117,11 +145,10 @@ function ManualControls({ onControl }: { onControl: (command: RobotCommand) => v
   const iconClass = "size-[22px]";
   const pad = (direction: Direction, label: string, icon: ReactNode, className: string) => (
     <PadButton
-      direction={direction}
       label={label}
       icon={icon}
-      active={activeDirection === direction}
-      onPress={setActiveDirection}
+      active={drive === direction || steer === direction}
+      onPress={(pressed) => press(direction, pressed)}
       className={className}
     />
   );
@@ -139,7 +166,7 @@ function ManualControls({ onControl }: { onControl: (command: RobotCommand) => v
         {pad("backward", "Назад", <ChevronDown aria-hidden className={iconClass} strokeWidth={2.5} />, "col-start-2 row-start-3")}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-1.5 text-caption text-text-muted">
-        <Keycap>W A S D</Keycap>або<Keycap>стрілки</Keycap>· тримайте, щоб їхати
+        <Keycap>W A S D</Keycap>або<Keycap>стрілки</Keycap>· ↑↓ хід, ←→ кермо
       </div>
       <div className="mt-1 flex flex-col gap-1.5">
         <div className="flex justify-between text-small">
@@ -169,7 +196,6 @@ export function ControlAside({
   onControlModeChange,
   onControl,
   robot,
-  cameraOnline,
   alarm,
   onStop,
   onResume,
@@ -226,7 +252,6 @@ export function ControlAside({
           <span className="text-heading font-semibold">Керування</span>
           <Segmented
             label="Керування"
-            disabled={!cameraOnline}
             options={[
               { value: "AUTO", label: "Авто" },
               { value: "MANUAL", label: "Ручне" },

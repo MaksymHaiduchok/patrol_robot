@@ -27,7 +27,7 @@ pnpm start
 
 ## Поведінка
 
-- `move forward/backward` — кермо прямо, хід ±`speed`%. `move left/right` і `turn left/right` — кермо в бік на `STEER_LIMIT_PERCENT`% від повного вивороту і хід вперед на `speed`% (машина не розвертається на місці).
+- Хід і кермо незалежні. `move forward/backward` — лише хід ±`speed`% (`speed: 0` — гальмо), кермо не змінюється. `steer left/right/center` — лише кермо: у бік на `STEER_LIMIT_PERCENT`% від повного вивороту або в центр. `move left/right` і `turn left/right` — те саме, що `steer` у той бік.
 - `stop` — гальмо на ходових, кермо прямо. `alert` — те саме і стан `ALERT`; `resume` повертає стан, що був до `alert`.
 - `hide` — маневр за часом: назад → поворот → вперед, потім стоп і стан `ALERT`. Будь-яка інша команда руху, `stop`, `alert` або watchdog його перериває.
 - `servo` не підтримується (немає поворотної голови). Датчика відстані немає, тому `distance_cm` у телеметрії — `null`, а `PATROL` не рухає машину сам.
