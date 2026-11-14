@@ -6,6 +6,7 @@
   "scripts": {
     "start": "tsx --env-file-if-exists=.env src/main.ts",
     "probe": "tsx scripts/probe.ts",
+    "check": "tsx --env-file-if-exists=.env scripts/check.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

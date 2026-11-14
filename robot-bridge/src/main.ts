@@ -40,6 +40,7 @@ const halt = (): void => {
 
 const hide = async (): Promise<void> => {
   const run = ++hideRun;
+
   log("Hide: почато");
   for (const step of hideSteps(config)) {
     if (run !== hideRun) {

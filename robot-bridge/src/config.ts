@@ -7,8 +7,9 @@ export type Config = {
   driveInvertedPorts: string[];
   steerPort: string;
   steerInverted: boolean;
-  steerAngle: number;
+  steerLimitPercent: number;
   steerSpeed: number;
+  steerCalibrationPower: number;
   watchdogSeconds: number;
   telemetryIntervalMs: number;
   hide: {
@@ -88,8 +89,9 @@ export const loadConfig = (): Config => ({
   driveInvertedPorts: readPorts("DRIVE_INVERTED_PORTS", ""),
   steerPort: readSinglePort("STEER_PORT", "D"),
   steerInverted: readBoolean("STEER_INVERTED", false),
-  steerAngle: readNumber("STEER_ANGLE", 60),
+  steerLimitPercent: readNumber("STEER_LIMIT_PERCENT", 90),
   steerSpeed: readNumber("STEER_SPEED", 50),
+  steerCalibrationPower: readNumber("STEER_CALIBRATION_POWER", 40),
   watchdogSeconds: readNumber("WATCHDOG_SECONDS", 2),
   telemetryIntervalMs: readNumber("TELEMETRY_INTERVAL_MS", 300),
   hide: {
