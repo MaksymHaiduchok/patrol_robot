@@ -8,6 +8,7 @@ import {
 import { WebSocket, type RawData, type Server } from 'ws';
 import type { OperatorServerMessage } from '../protocol/protocol.js';
 import { DecisionService } from '../decision/decision.service.js';
+import { NavigationService } from '../navigation/navigation.service.js';
 import { RobotGateway } from '../robot/robot.gateway.js';
 import { decodeMessage } from '../robot/robot.validation.js';
 import { parseOperatorMessage } from './operator.validation.js';
@@ -25,6 +26,7 @@ export class OperatorGateway
   constructor(
     private readonly robotGateway: RobotGateway,
     private readonly decision: DecisionService,
+    private readonly navigation: NavigationService,
   ) {}
 
   onModuleInit(): void {
@@ -33,6 +35,9 @@ export class OperatorGateway
     );
     this.decision.onModeChange((mode) =>
       this.broadcast({ type: 'system_mode', mode }),
+    );
+    this.navigation.onModeChange((mode) =>
+      this.broadcast({ type: 'navigation_mode', mode }),
     );
   }
 
@@ -46,6 +51,10 @@ export class OperatorGateway
     this.sendTo(client, {
       type: 'system_mode',
       mode: this.decision.systemMode,
+    });
+    this.sendTo(client, {
+      type: 'navigation_mode',
+      mode: this.navigation.navigationMode,
     });
   }
 
@@ -83,12 +92,21 @@ export class OperatorGateway
       this.decision.setMode(message.mode);
       return;
     }
+    if (message.type === 'set_navigation') {
+      this.navigation.setMode(message.mode);
+      return;
+    }
     const { command } = message;
+    if (command.cmd === 'navigation') {
+      this.logger.warn('navigation must be changed with set_navigation');
+      return;
+    }
     if (this.decision.systemMode === 'STATIONARY' && command.cmd !== 'stop') {
       this.logger.warn(`command ${command.cmd} ignored: STATIONARY mode`);
       return;
     }
     this.decision.onOperatorControl();
+    this.navigation.onOperatorCommand(command);
     if (
       command.cmd === 'move' ||
       command.cmd === 'turn' ||

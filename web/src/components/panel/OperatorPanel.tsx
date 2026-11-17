@@ -12,7 +12,7 @@ import { StatCard, type StatTone } from "@/components/ui/StatCard";
 import { Toast } from "@/components/ui/Toast";
 import { eventTitle, formatTime } from "@/lib/eventLabels";
 import { toFeedItem } from "@/lib/eventView";
-import type { EventRecord, SystemMode } from "@/lib/protocol";
+import type { EventRecord, NavigationMode, SystemMode } from "@/lib/protocol";
 import type { RobotStatus } from "@/lib/robot";
 import type { ControlMode } from "@/lib/types";
 import { useNow } from "@/lib/useNow";
@@ -59,6 +59,7 @@ function buildCards(
   fps: number | null,
   robot: RobotStatus,
   systemMode: SystemMode,
+  navigationMode: NavigationMode,
   manual: boolean,
   alarm: boolean,
 ): StatCardData[] {
@@ -78,7 +79,9 @@ function buildCards(
     : manual
       ? { label: "Стан робота", value: "Ручне", tone: "accent" }
       : patrol && robot.online && robot.state === "PATROL"
-        ? robot.home === "patrolling"
+        ? navigationMode === "FREE"
+          ? { label: "Стан робота", value: "Їде сам", tone: "ok" }
+          : robot.home === "patrolling"
           ? { label: "Стан робота", value: "Патрулює маршрутом", tone: "ok" }
           : { label: "Стан робота", value: "Чекає на місці", tone: "ok" }
         : { label: "Стан робота", value: "Очікування", tone: "neutral" };
@@ -113,8 +116,10 @@ export function OperatorPanel() {
     pendingReview,
     robot,
     systemMode,
+    navigationMode,
     sendControl,
     setSystemMode,
+    setNavigationMode,
     applyUpdate,
     dismissReview,
     reopenReview,
@@ -142,7 +147,7 @@ export function OperatorPanel() {
     () => events.map((event) => toFeedItem(event, names, now ?? 0, reviewTarget?.id ?? null)),
     [events, names, now, reviewTarget],
   );
-  const cards = buildCards(cameraOnline, fps, robot, systemMode, manual, alarmActive);
+  const cards = buildCards(cameraOnline, fps, robot, systemMode, navigationMode, manual, alarmActive);
   const clock = now === null ? "--:--:--" : new Date(now).toLocaleTimeString("uk-UA");
 
   const resume = () => sendControl({ type: "command", cmd: "resume" });
@@ -213,6 +218,8 @@ export function OperatorPanel() {
             onSystemModeChange={setSystemMode}
             controlMode={controlMode}
             onControlModeChange={changeControlMode}
+            navigationMode={navigationMode}
+            onNavigationModeChange={setNavigationMode}
             onControl={sendControl}
             onSetHome={setHome}
             robot={robot}

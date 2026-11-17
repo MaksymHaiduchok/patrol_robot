@@ -4,7 +4,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, House, Info, MapPin,
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/Segmented";
-import type { HomeState, RobotCommand, SystemMode } from "@/lib/protocol";
+import type { HomeState, NavigationMode, RobotCommand, SystemMode } from "@/lib/protocol";
 import type { RobotStatus } from "@/lib/robot";
 import type { ControlMode, Direction } from "@/lib/types";
 
@@ -24,6 +24,8 @@ type ControlAsideProps = {
   onSystemModeChange: (mode: SystemMode) => void;
   controlMode: ControlMode;
   onControlModeChange: (mode: ControlMode) => void;
+  navigationMode: NavigationMode;
+  onNavigationModeChange: (mode: NavigationMode) => void;
   onControl: (command: RobotCommand) => void;
   onSetHome: () => void;
   robot: RobotStatus;
@@ -239,6 +241,8 @@ export function ControlAside({
   onSystemModeChange,
   controlMode,
   onControlModeChange,
+  navigationMode,
+  onNavigationModeChange,
   onControl,
   onSetHome,
   robot,
@@ -305,10 +309,23 @@ export function ControlAside({
             value={controlMode}
             onChange={onControlModeChange}
           />
+          {!manual && (
+            <Segmented
+              label="Як патрулювати"
+              options={[
+                { value: "ROUTE", label: "Маршрутом" },
+                { value: "FREE", label: "Сам, за камерою" },
+              ]}
+              value={navigationMode}
+              onChange={onNavigationModeChange}
+            />
+          )}
           <span className="text-small text-text-muted">
             {manual
               ? "Керуєте ви. Датчика перешкод на машинці немає — стежте за відео. Щоб задати маршрут патруля: «Зафіксувати» дім, проїдьте маршрут і перемкніть на «Авто»."
-              : robot.home === "patrolling"
+              : navigationMode === "FREE"
+                ? "Машинка їде сама: камера оцінює глибину, машинка об'їжджає те, що ближче за поріг, а якщо уперлась — здає назад. Їде повільно, стежте за відео."
+                : robot.home === "patrolling"
                 ? "Машинка їздить записаним маршрутом між домом і кінцем маршруту, зупиняється, коли бачить людину."
                 : "Маршруту немає: робот стоїть і реагує на людей у кадрі. Щоб патрулював — у «Ручне» зафіксуйте дім, проїдьте маршрут і поверніться в «Авто»."}
           </span>

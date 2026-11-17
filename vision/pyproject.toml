@@ -10,6 +10,7 @@ dependencies = [
     "opencv-python>=5.0.0.93",
     "pillow>=13.0.0",
     "python-dotenv>=1.2.4",
+    "transformers>=5.23.0",
     "ultralytics>=8.4.207",
     "uvicorn[standard]>=0.54.0",
 ]

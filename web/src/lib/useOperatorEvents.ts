@@ -5,6 +5,7 @@ import { fetchEvents } from "@/lib/api";
 import { API_WS_URL } from "@/lib/config";
 import type {
   EventRecord,
+  NavigationMode,
   OperatorClientMessage,
   OperatorServerMessage,
   RobotCommand,
@@ -22,8 +23,10 @@ type OperatorEvents = {
   pendingReview: EventRecord[];
   robot: RobotStatus;
   systemMode: SystemMode;
+  navigationMode: NavigationMode;
   sendControl: (command: RobotCommand) => void;
   setSystemMode: (mode: SystemMode) => void;
+  setNavigationMode: (mode: NavigationMode) => void;
   applyUpdate: (event: EventRecord) => void;
   dismissReview: (id: string) => void;
   reopenReview: (event: EventRecord) => void;
@@ -41,6 +44,7 @@ export function useOperatorEvents(): OperatorEvents {
   const [pendingReview, setPendingReview] = useState<EventRecord[]>([]);
   const [robot, setRobot] = useState<RobotStatus>(ROBOT_OFFLINE);
   const [systemMode, setMode] = useState<SystemMode>("PATROL");
+  const [navigationMode, setNavigation] = useState<NavigationMode>("ROUTE");
   const socketRef = useRef<WebSocket | null>(null);
 
   const send = useCallback((message: OperatorClientMessage) => {
@@ -52,6 +56,11 @@ export function useOperatorEvents(): OperatorEvents {
   const sendControl = useCallback((command: RobotCommand) => send({ type: "control", command }), [send]);
 
   const setSystemMode = useCallback((mode: SystemMode) => send({ type: "set_mode", mode }), [send]);
+
+  const setNavigationMode = useCallback(
+    (mode: NavigationMode) => send({ type: "set_navigation", mode }),
+    [send],
+  );
 
   const applyUpdate = useCallback((event: EventRecord) => {
     setEvents((current) => upsert(current, event));
@@ -108,6 +117,10 @@ export function useOperatorEvents(): OperatorEvents {
           setMode(data.mode);
           return;
         }
+        if (data.type === "navigation_mode") {
+          setNavigation(data.mode);
+          return;
+        }
         applyUpdate(data.event);
         if (data.type === "event_created" && data.event.type === "stranger_detected") {
           setPendingReview((current) => [...current, data.event]);
@@ -131,8 +144,10 @@ export function useOperatorEvents(): OperatorEvents {
     pendingReview,
     robot,
     systemMode,
+    navigationMode,
     sendControl,
     setSystemMode,
+    setNavigationMode,
     applyUpdate,
     dismissReview,
     reopenReview,

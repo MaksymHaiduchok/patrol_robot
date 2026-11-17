@@ -4,7 +4,10 @@ import {
   Logger,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { FaceFailureReason } from '../protocol/protocol.js';
+import type {
+  FaceFailureReason,
+  VisionObstacles,
+} from '../protocol/protocol.js';
 
 type EmbedResponse = {
   embedding: number[];
@@ -26,6 +29,7 @@ const FACE_FAILURE_REASONS: FaceFailureReason[] = [
 ];
 
 const REQUEST_TIMEOUT_MS = 10_000;
+const OBSTACLES_TIMEOUT_MS = 500;
 
 export class FaceRejectedError extends UnprocessableEntityException {
   constructor(readonly reason: FaceFailureReason) {
@@ -66,6 +70,17 @@ export class VisionService {
       return null;
     }
     return Buffer.from(await response.arrayBuffer());
+  }
+
+  async obstacles(): Promise<VisionObstacles | null> {
+    try {
+      const response = await fetch(`${this.baseUrl}/obstacles`, {
+        signal: AbortSignal.timeout(OBSTACLES_TIMEOUT_MS),
+      });
+      return response.ok ? ((await response.json()) as VisionObstacles) : null;
+    } catch {
+      return null;
+    }
   }
 
   async reload(): Promise<void> {

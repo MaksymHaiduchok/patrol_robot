@@ -22,6 +22,7 @@ pnpm start:dev
 
 - `DecisionService` — автоматичні реакції робота на події vision і режим системи (`PATROL`/`STATIONARY`); правила — `docs/protocol.md`, «Автоматичні реакції».
 - `ClaudeService` — опис сцени за знімком для `stranger_detected`.
+- `NavigationService` — вільне патрулювання: опитує vision `/obstacles` і веде робота в об'їзд перешкод.
 - `RobotGateway`, `OperatorGateway` — WebSocket до робота й до web.
 
 На всіх таблицях увімкнено RLS без політик: публічний (publishable) ключ доступу до них не має, api працює із секретним ключем, який RLS обходить.
@@ -49,5 +50,10 @@ pnpm start:dev
 | `ANTHROPIC_MODEL` | модель для опису сцени (`claude-haiku-5-5`) |
 | `CLAUDE_ENABLED` | `false` — не викликати Claude навіть із ключем |
 | `CORS_ORIGINS` | дозволені origin-и браузера через кому (`http://localhost:3000`) |
+| `NAV_SPEED` | вільне патрулювання: швидкість, % |
+| `NAV_REVERSE_MS`, `NAV_TURN_MS` | маневр об'їзду: скільки їхати назад і скільки повертати вперед |
+| `NAV_POLL_MS` | як часто питати vision `/obstacles` |
+| `NAV_STALE_MS` | гальмо, якщо дані глибини старші |
+| `NAV_STALL_MS` | удар: хід подано, а колеса стільки часу не крутяться |
 | `VISION_URL` | адреса vision |
 | `ALERT_RESUME_TIMEOUT_SECONDS` | через скільки секунд без людей робот повертається до патрулювання |

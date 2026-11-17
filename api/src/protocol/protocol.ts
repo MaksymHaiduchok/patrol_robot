@@ -62,6 +62,21 @@ export type AddPhotosResult = {
   failed: { file: string; reason: FaceFailureReason }[];
 };
 
+export type ObstacleZones = {
+  left: number;
+  center: number;
+  right: number;
+};
+
+export type VisionObstacles = {
+  ts: number;
+  frame_id: number;
+  age_ms: number;
+  near_ratio: number;
+  zones: ObstacleZones;
+  near: { left: boolean; center: boolean; right: boolean };
+};
+
 export type RobotState = 'IDLE' | 'PATROL' | 'ALERT' | 'MANUAL';
 
 export type RobotDirection = 'forward' | 'backward' | 'left' | 'right';
@@ -69,6 +84,8 @@ export type RobotDirection = 'forward' | 'backward' | 'left' | 'right';
 export type SteerDirection = 'left' | 'right' | 'center';
 
 export type HubStatus = 'online' | 'offline';
+
+export type NavigationMode = 'ROUTE' | 'FREE';
 
 export type HomeState = 'none' | 'recording' | 'returning' | 'patrolling';
 
@@ -83,7 +100,8 @@ export type RobotCommand =
   | { type: 'command'; cmd: 'resume' }
   | { type: 'command'; cmd: 'hide' }
   | { type: 'command'; cmd: 'set_home' }
-  | { type: 'command'; cmd: 'return_home' };
+  | { type: 'command'; cmd: 'return_home' }
+  | { type: 'command'; cmd: 'navigation'; mode: NavigationMode };
 
 export type ApiToRobotMessage = RobotCommand | { type: 'ping'; ts: number };
 
@@ -96,6 +114,7 @@ export type RobotToApiMessage =
       hub: HubStatus;
       battery: number | null;
       home: HomeState;
+      odometer?: number | null;
       ts: number;
     }
   | { type: 'pong'; ts: number }
@@ -115,8 +134,10 @@ export type OperatorServerMessage =
   | { type: 'event_created'; event: EventRecord }
   | { type: 'event_updated'; event: EventRecord }
   | { type: 'robot_status'; robot: RobotStatus }
-  | { type: 'system_mode'; mode: SystemMode };
+  | { type: 'system_mode'; mode: SystemMode }
+  | { type: 'navigation_mode'; mode: NavigationMode };
 
 export type OperatorClientMessage =
   | { type: 'control'; command: RobotCommand }
-  | { type: 'set_mode'; mode: SystemMode };
+  | { type: 'set_mode'; mode: SystemMode }
+  | { type: 'set_navigation'; mode: NavigationMode };

@@ -2,6 +2,7 @@ import type { RawData } from 'ws';
 import type {
   HomeState,
   HubStatus,
+  NavigationMode,
   RobotCommand,
   RobotDirection,
   RobotState,
@@ -24,6 +25,8 @@ const HOME_STATES: HomeState[] = [
 
 const HUB_STATUSES: HubStatus[] = ['online', 'offline'];
 
+const NAVIGATION_MODES: NavigationMode[] = ['ROUTE', 'FREE'];
+
 const COMMANDS: RobotCommand['cmd'][] = [
   'move',
   'turn',
@@ -36,6 +39,7 @@ const COMMANDS: RobotCommand['cmd'][] = [
   'hide',
   'set_home',
   'return_home',
+  'navigation',
 ];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -55,6 +59,9 @@ const isHomeState = (value: unknown): value is HomeState =>
 
 const isHubStatus = (value: unknown): value is HubStatus =>
   HUB_STATUSES.some((status) => status === value);
+
+export const isNavigationMode = (value: unknown): value is NavigationMode =>
+  NAVIGATION_MODES.some((mode) => mode === value);
 
 const isCommandName = (value: unknown): value is RobotCommand['cmd'] =>
   COMMANDS.some((cmd) => cmd === value);
@@ -84,7 +91,7 @@ export const parseRobotCommand = (value: unknown): RobotCommand | null => {
   if (!isRecord(value) || !isCommandName(value.cmd)) {
     return null;
   }
-  const { cmd, dir, speed, state, pan, tilt } = value;
+  const { cmd, dir, speed, state, pan, tilt, mode } = value;
 
   switch (cmd) {
     case 'move':
@@ -102,6 +109,8 @@ export const parseRobotCommand = (value: unknown): RobotCommand | null => {
       return isSteerDirection(dir) ? { type: 'command', cmd, dir } : null;
     case 'set_state':
       return isRobotState(state) ? { type: 'command', cmd, state } : null;
+    case 'navigation':
+      return isNavigationMode(mode) ? { type: 'command', cmd, mode } : null;
     case 'servo':
       return typeof pan === 'number' && typeof tilt === 'number'
         ? { type: 'command', cmd, pan, tilt }
@@ -121,8 +130,18 @@ export const parseRobotMessage = (raw: string): RobotToApiMessage | null => {
   if (!isRecord(message)) {
     return null;
   }
-  const { type, robot_id, state, distance_cm, hub, battery, home, ts, cmd } =
-    message;
+  const {
+    type,
+    robot_id,
+    state,
+    distance_cm,
+    hub,
+    battery,
+    home,
+    odometer,
+    ts,
+    cmd,
+  } = message;
 
   switch (type) {
     case 'hello':
@@ -133,8 +152,18 @@ export const parseRobotMessage = (raw: string): RobotToApiMessage | null => {
         isHubStatus(hub) &&
         isNullableNumber(battery) &&
         isHomeState(home) &&
+        (odometer === undefined || isNullableNumber(odometer)) &&
         typeof ts === 'number'
-        ? { type, state, distance_cm, hub, battery, home, ts }
+        ? {
+            type,
+            state,
+            distance_cm,
+            hub,
+            battery,
+            home,
+            odometer: odometer ?? null,
+            ts,
+          }
         : null;
     case 'pong':
       return typeof ts === 'number' ? { type, ts } : null;

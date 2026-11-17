@@ -3,6 +3,7 @@ import base64
 import logging
 import os
 import threading
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -14,8 +15,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 
-from annotate import draw_detections
+from annotate import draw_detections, draw_obstacles
 from capture import FrameGrabber
+from depth import DepthBand, DepthEstimator
 from detector import Detection, PersonDetector
 from events import EventSender, PresenceTracker
 from experiment_log import ExperimentLog
@@ -46,7 +48,38 @@ detector = PersonDetector(
     confidence=float(os.getenv("PERSON_CONFIDENCE", "0.5")),
     max_fps=float(os.getenv("DETECTION_MAX_FPS", "10")),
 )
-grabber.set_annotator(lambda frame: draw_detections(frame, detector.detections()))
+OBSTACLE_NEAR_RATIO = float(os.getenv("OBSTACLE_NEAR_RATIO", "0.7"))
+depth = (
+    DepthEstimator(
+        source=grabber,
+        model_name=os.getenv("DEPTH_MODEL", "depth-anything/Depth-Anything-V2-Small-hf"),
+        device=os.getenv("YOLO_DEVICE", "mps"),
+        max_fps=float(os.getenv("DEPTH_MAX_FPS", "8")),
+        band=DepthBand(
+            top=float(os.getenv("DEPTH_BAND_TOP", "0.30")),
+            bottom=float(os.getenv("DEPTH_BAND_BOTTOM", "0.60")),
+            floor_rows=float(os.getenv("DEPTH_FLOOR_ROWS", "0.12")),
+            reference="frame" if os.getenv("DEPTH_REFERENCE", "floor") == "frame" else "floor",
+            percentile=float(os.getenv("DEPTH_ZONE_PERCENTILE", "50")),
+        ),
+    )
+    if os.getenv("DEPTH_ENABLED", "1") == "1"
+    else None
+)
+
+
+def annotate(frame: np.ndarray) -> None:
+    draw_detections(frame, detector.detections())
+    if depth is None:
+        return
+    obstacles = depth.obstacles()
+    zones = (obstacles.left, obstacles.center, obstacles.right) if obstacles else None
+    draw_obstacles(
+        frame, zones, OBSTACLE_NEAR_RATIO, (depth.band.top, depth.band.bottom), depth.preview()
+    )
+
+
+grabber.set_annotator(annotate)
 presence = PresenceTracker(cooldown_seconds=float(os.getenv("EVENT_COOLDOWN_SECONDS", "15")))
 sender = EventSender(API_URL)
 snapshots = SnapshotStore()
@@ -94,10 +127,14 @@ def load_known_faces_until_ready() -> None:
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     grabber.start()
     detector.start()
+    if depth is not None:
+        depth.start()
     threading.Thread(target=load_known_faces_until_ready, name="faces-loader", daemon=True).start()
     logger.info("vision started, source=%s, device=%s", grabber.source, detector.device)
     yield
     stop_loading.set()
+    if depth is not None:
+        depth.stop()
     detector.stop()
     grabber.stop()
     sender.close()
@@ -153,6 +190,24 @@ def snapshot(ts: int | None = None) -> Response:
     return Response(content=jpeg, media_type="image/jpeg")
 
 
+@app.get("/obstacles")
+def obstacles() -> dict[str, int | float | bool | dict[str, float | bool]]:
+    if depth is None:
+        raise HTTPException(status_code=503, detail="depth_disabled")
+    current = depth.obstacles()
+    if current is None:
+        raise HTTPException(status_code=503, detail="no_depth_yet")
+    zones = {"left": current.left, "center": current.center, "right": current.right}
+    return {
+        "ts": current.ts,
+        "frame_id": current.frame_id,
+        "age_ms": int(time.time() * 1000) - current.ts,
+        "near_ratio": OBSTACLE_NEAR_RATIO,
+        "zones": {name: round(value, 3) for name, value in zones.items()},
+        "near": {name: value >= OBSTACLE_NEAR_RATIO for name, value in zones.items()},
+    }
+
+
 @app.get("/health")
 def health() -> dict[str, str | bool | float]:
     return {
@@ -167,6 +222,7 @@ def metrics() -> dict[str, str | int | float]:
     return {
         "capture_fps": round(grabber.fps, 1),
         **detector.stats(),
+        **(depth.stats() if depth is not None else {}),
         "persons_in_frame": len(detector.detections()),
         "known_faces": recognizer.known_count,
         "device": detector.device,

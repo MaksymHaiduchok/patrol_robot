@@ -13,6 +13,8 @@ uv run uvicorn main:app --reload --port 8001 --timeout-graceful-shutdown 1
 
 Перевірка: http://localhost:8001/health (стан і FPS), http://localhost:8001/stream (відео з рамками), http://localhost:8001/metrics (FPS детекції, час інференсу YOLO).
 
+`GET /obstacles` — оцінка перешкод камерою для вільного патрулювання: зони ліво / центр / право й `near` для кожної (формат у `docs/protocol.md`). На `/stream` видно смугу пошуку, значення зон (червоне — зайнято) і мініатюру карти глибини в правому нижньому куті.
+
 `GET /snapshot?ts=<ts події>` — сирий кадр, на якому сформовано подію `person_detected` / `stranger_detected` (vision тримає 20 останніх); без `ts` — останній кадр з камери. Викликає api для знімків у журналі.
 
 Ендпоінти облич (викликає api): `POST /faces/embed` (тіло — байти зображення), `POST /faces/capture` (обличчя з поточного кадру), `POST /faces/reload` (перечитати «своїх» з api). Вектори «своїх» vision бере з `GET {API_URL}/persons/embeddings` при старті.
@@ -43,3 +45,10 @@ uv run uvicorn main:app --reload --port 8001 --timeout-graceful-shutdown 1
 | `EVENT_COOLDOWN_SECONDS` | антидребезг подій |
 | `CORS_ORIGINS` | дозволені origin-и для браузера (через кому) |
 | `EXPERIMENT_LOG` | `1` — писати CSV для замірів точності |
+| `DEPTH_ENABLED` | `1` — оцінка глибини для вільного патрулювання |
+| `DEPTH_MODEL` | модель глибини (`depth-anything/Depth-Anything-V2-Small-hf`, ~100 МБ, завантажується при першому запуску) |
+| `DEPTH_MAX_FPS` | максимальна частота оцінки глибини |
+| `DEPTH_BAND_TOP`, `DEPTH_BAND_BOTTOM` | смуга кадру (частки висоти), де шукаються перешкоди |
+| `DEPTH_REFERENCE` | з чим порівнювати зону: `floor` — з підлогою в нижніх `DEPTH_FLOOR_ROWS` кадру (телефон дивиться трохи вниз), `frame` — з медіаною всього кадру (смуга внизу кадру) |
+| `DEPTH_FLOOR_ROWS` | частка кадру знизу — підлога для нормування (лише `DEPTH_REFERENCE=floor`) |
+| `OBSTACLE_NEAR_RATIO` | поріг «зайнято»: близькість зони / близькість підлоги |

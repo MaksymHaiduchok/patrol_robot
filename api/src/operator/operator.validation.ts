@@ -2,7 +2,11 @@ import type {
   OperatorClientMessage,
   SystemMode,
 } from '../protocol/protocol.js';
-import { parseJson, parseRobotCommand } from '../robot/robot.validation.js';
+import {
+  isNavigationMode,
+  parseJson,
+  parseRobotCommand,
+} from '../robot/robot.validation.js';
 
 const SYSTEM_MODES: SystemMode[] = ['PATROL', 'STATIONARY'];
 
@@ -19,6 +23,9 @@ export const parseOperatorMessage = (
   const { type, command, mode } = message as Record<string, unknown>;
   if (type === 'set_mode') {
     return isSystemMode(mode) ? { type, mode } : null;
+  }
+  if (type === 'set_navigation') {
+    return isNavigationMode(mode) ? { type, mode } : null;
   }
   if (type !== 'control') {
     return null;

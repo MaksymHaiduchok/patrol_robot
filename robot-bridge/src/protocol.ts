@@ -6,6 +6,8 @@ export type SteerDirection = "left" | "right" | "center";
 
 export type HubStatus = "online" | "offline";
 
+export type NavigationMode = "ROUTE" | "FREE";
+
 export type HomeState = "none" | "recording" | "returning" | "patrolling";
 
 export type RobotCommand =
@@ -19,7 +21,8 @@ export type RobotCommand =
   | { type: "command"; cmd: "resume" }
   | { type: "command"; cmd: "hide" }
   | { type: "command"; cmd: "set_home" }
-  | { type: "command"; cmd: "return_home" };
+  | { type: "command"; cmd: "return_home" }
+  | { type: "command"; cmd: "navigation"; mode: NavigationMode };
 
 export type ApiToRobotMessage = RobotCommand | { type: "ping"; ts: number };
 
@@ -32,6 +35,7 @@ export type RobotToApiMessage =
       hub: HubStatus;
       battery: number | null;
       home: HomeState;
+      odometer?: number | null;
       ts: number;
     }
   | { type: "pong"; ts: number }

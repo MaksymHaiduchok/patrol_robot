@@ -61,3 +61,38 @@ def draw_detections(frame: np.ndarray, detections: list[Detection]) -> None:
         text, color = label_for(detection)
         cv2.rectangle(frame, (box.x1, box.y1), (box.x2, box.y2), color, thickness)
         paste_label(frame, render_label(text, color, font_size), box.x1, box.y1)
+
+
+NEAR_COLOR = (40, 40, 230)
+FREE_COLOR = (0, 200, 0)
+BAND_COLOR = (200, 200, 200)
+PREVIEW_SCALE = 0.25
+
+
+def draw_obstacles(
+    frame: np.ndarray,
+    zones: tuple[float, float, float] | None,
+    near_ratio: float,
+    band: tuple[float, float],
+    preview: np.ndarray | None,
+) -> None:
+    height, width = frame.shape[:2]
+    top, bottom = int(height * band[0]), int(height * band[1])
+    for x in (width // 3, width * 2 // 3):
+        cv2.line(frame, (x, top), (x, bottom), BAND_COLOR, 1)
+    cv2.line(frame, (0, top), (width, top), BAND_COLOR, 1)
+    cv2.line(frame, (0, bottom), (width, bottom), BAND_COLOR, 1)
+
+    if zones is not None:
+        font_size = max(14, width // 50)
+        for index, value in enumerate(zones):
+            color = NEAR_COLOR if value >= near_ratio else FREE_COLOR
+            label = render_label(f"{value:.2f}", color, font_size)
+            x = width * index // 3 + (width // 3 - label.shape[1]) // 2
+            paste_label(frame, label, x, bottom)
+
+    if preview is not None:
+        preview_width = int(width * PREVIEW_SCALE)
+        preview_height = int(preview.shape[0] * preview_width / preview.shape[1])
+        small = cv2.resize(preview, (preview_width, preview_height))
+        frame[height - preview_height : height, width - preview_width : width] = small

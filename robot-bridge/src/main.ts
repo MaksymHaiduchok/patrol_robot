@@ -4,7 +4,14 @@ import { hideSteps } from "./hide.js";
 import { pathLength, returnHome } from "./home.js";
 import { log, sleep } from "./log.js";
 import { PathRecorder, type PathPoint } from "./path.js";
-import type { ApiToRobotMessage, HomeState, RobotCommand, RobotState, RobotToApiMessage } from "./protocol.js";
+import type {
+  ApiToRobotMessage,
+  HomeState,
+  NavigationMode,
+  RobotCommand,
+  RobotState,
+  RobotToApiMessage,
+} from "./protocol.js";
 
 const RECONNECT_DELAY_MS = 2000;
 const PATH_SAMPLE_MS = 20;
@@ -27,6 +34,7 @@ let towardHome = true;
 let legPath: PathPoint[] | null = null;
 let patrolTask: Promise<void> | null = null;
 let patrolRestart = false;
+let navigation: NavigationMode = "ROUTE";
 
 car.onDisconnect(() => {
   if (recorder.hasHome) {
@@ -138,7 +146,7 @@ const startPatrol = (): void => {
     patrolRestart = true;
     return;
   }
-  if (state !== "PATROL" || car.status === "offline" || returning) {
+  if (state !== "PATROL" || navigation !== "ROUTE" || car.status === "offline" || returning) {
     return;
   }
   if (!route) {
@@ -215,6 +223,11 @@ const handleCommand = (command: RobotCommand): void => {
     log(`Команда ${command.cmd} проігнорована: хаб offline`);
     return;
   }
+  const driving = command.cmd === "move" || command.cmd === "turn" || command.cmd === "steer";
+  if (driving && state === "ALERT") {
+    log(`Команда ${command.cmd} проігнорована: стан ALERT, спершу resume`);
+    return;
+  }
   log(`Команда: ${JSON.stringify(command)}`);
 
   switch (command.cmd) {
@@ -269,6 +282,15 @@ const handleCommand = (command: RobotCommand): void => {
       break;
     case "set_home":
       setHome();
+      break;
+    case "navigation":
+      navigation = command.mode;
+      log(`Навігація: ${command.mode === "FREE" ? "вільна їзда (кермує api за камерою)" : "маршрутом"}`);
+      if (command.mode === "FREE") {
+        void endPatrol();
+      } else {
+        startPatrol();
+      }
       break;
     case "return_home":
       if (!recorder.hasHome) {
@@ -353,6 +375,7 @@ const sendTelemetry = (): void => {
     hub: car.status,
     battery: car.battery,
     home: homeState(),
+    odometer: car.status === "online" ? Math.round(car.driveDegrees()) : null,
     ts: Date.now(),
   });
 };

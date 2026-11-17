@@ -8,6 +8,7 @@ import {
 import { WebSocket, type RawData } from 'ws';
 import type {
   ApiToRobotMessage,
+  NavigationMode,
   RobotCommand,
   RobotState,
   RobotStatus,
@@ -42,9 +43,16 @@ export class RobotGateway
   private status: RobotStatus = OFFLINE_STATUS;
   private pingTimer: ReturnType<typeof setInterval> | undefined;
   private requestedState: RobotState | null = null;
+  private requestedNavigation: NavigationMode | null = null;
+  private odometerValue: number | null = null;
+  private odometerAt = 0;
 
   get currentStatus(): RobotStatus {
     return this.status;
+  }
+
+  get odometer(): { degrees: number | null; at: number } {
+    return { degrees: this.odometerValue, at: this.odometerAt };
   }
 
   afterInit(): void {
@@ -89,6 +97,9 @@ export class RobotGateway
     if (command.cmd === 'set_state') {
       this.requestedState = command.state;
     }
+    if (command.cmd === 'navigation') {
+      this.requestedNavigation = command.mode;
+    }
     this.logger.log(`→ robot ${JSON.stringify(command)}`);
     this.send(command);
     return true;
@@ -116,6 +127,13 @@ export class RobotGateway
           robot_id: message.robot_id,
           connected: true,
         });
+        if (this.requestedNavigation) {
+          this.sendCommand({
+            type: 'command',
+            cmd: 'navigation',
+            mode: this.requestedNavigation,
+          });
+        }
         if (this.requestedState) {
           this.sendCommand({
             type: 'command',
@@ -125,6 +143,8 @@ export class RobotGateway
         }
         break;
       case 'telemetry':
+        this.odometerValue = message.odometer ?? null;
+        this.odometerAt = Date.now();
         this.updateStatus({
           ...this.status,
           connected: true,
