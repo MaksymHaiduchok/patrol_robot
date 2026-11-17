@@ -31,6 +31,7 @@ export class DecisionService implements OnModuleInit, OnModuleDestroy {
   private alertBySystem = false;
   private strangerInVisit = false;
   private lastPersonEventAt = 0;
+  private visitOpen = false;
   private robotState: RobotState = 'IDLE';
   private timer: ReturnType<typeof setInterval> | undefined;
 
@@ -76,6 +77,7 @@ export class DecisionService implements OnModuleInit, OnModuleDestroy {
   }
 
   onVisionEvent(event: VisionEvent, receivedAt: number): void {
+    this.visitOpen = event.type !== 'person_left';
     if (this.mode !== 'PATROL') {
       return;
     }
@@ -147,6 +149,7 @@ export class DecisionService implements OnModuleInit, OnModuleDestroy {
   private checkTimeout(): void {
     if (
       !this.alertBySystem ||
+      this.visitOpen ||
       Date.now() - this.lastPersonEventAt < this.resumeTimeoutMs
     ) {
       return;
