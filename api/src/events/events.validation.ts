@@ -79,9 +79,9 @@ export const parseReviewRequest = (body: unknown): ReviewEventRequest => {
   }
   const { status, person_id } = body as Record<string, unknown>;
 
-  if (!isReviewStatus(status)) {
+  if (status !== null && !isReviewStatus(status)) {
     throw new BadRequestException(
-      `status must be one of: ${REVIEW_STATUSES.join(', ')}`,
+      `status must be null or one of: ${REVIEW_STATUSES.join(', ')}`,
     );
   }
   if (!isNullableString(person_id)) {

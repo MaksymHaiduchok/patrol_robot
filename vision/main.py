@@ -12,13 +12,15 @@ import numpy as np
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
 from annotate import draw_detections
 from capture import FrameGrabber
 from detector import Detection, PersonDetector
 from events import EventSender, PresenceTracker
+from experiment_log import ExperimentLog
 from faces import FaceError, FaceRecognizer, KnownFace, normalize
+from snapshots import SnapshotStore, encode_jpeg
 
 load_dotenv()
 
@@ -47,11 +49,20 @@ detector = PersonDetector(
 grabber.set_annotator(lambda frame: draw_detections(frame, detector.detections()))
 presence = PresenceTracker(cooldown_seconds=float(os.getenv("EVENT_COOLDOWN_SECONDS", "15")))
 sender = EventSender(API_URL)
+snapshots = SnapshotStore()
+experiment = ExperimentLog() if os.getenv("EXPERIMENT_LOG") == "1" else None
 stop_loading = threading.Event()
+SNAPSHOT_EVENTS = {"person_detected", "stranger_detected"}
 
 
-def on_detections(detections: list[Detection], now: float) -> None:
+def on_detections(
+    detections: list[Detection], now: float, frame_id: int, frame: np.ndarray
+) -> None:
+    if experiment is not None:
+        experiment.write(detections, frame_id)
     for event in presence.update(detections, now):
+        if event.type in SNAPSHOT_EVENTS:
+            snapshots.save(event.ts, frame)
         sender.send(event)
 
 
@@ -90,6 +101,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     detector.stop()
     grabber.stop()
     sender.close()
+    if experiment is not None:
+        experiment.close()
     logger.info("vision stopped")
 
 
@@ -126,6 +139,18 @@ def stream() -> StreamingResponse:
         mjpeg_frames(),
         media_type=f"multipart/x-mixed-replace; boundary={STREAM_BOUNDARY}",
     )
+
+
+@app.get("/snapshot")
+def snapshot(ts: int | None = None) -> Response:
+    if ts is not None:
+        jpeg = snapshots.get(ts)
+    else:
+        _, frame = grabber.latest_frame()
+        jpeg = encode_jpeg(frame) if frame is not None else None
+    if jpeg is None:
+        raise HTTPException(status_code=404, detail="no_snapshot")
+    return Response(content=jpeg, media_type="image/jpeg")
 
 
 @app.get("/health")

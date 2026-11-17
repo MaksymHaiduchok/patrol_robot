@@ -15,7 +15,12 @@ const DIRECTIONS: RobotDirection[] = ['forward', 'backward', 'left', 'right'];
 
 const STEER_DIRECTIONS: SteerDirection[] = ['left', 'right', 'center'];
 
-const HOME_STATES: HomeState[] = ['none', 'recording', 'returning'];
+const HOME_STATES: HomeState[] = [
+  'none',
+  'recording',
+  'returning',
+  'patrolling',
+];
 
 const HUB_STATUSES: HubStatus[] = ['online', 'offline'];
 

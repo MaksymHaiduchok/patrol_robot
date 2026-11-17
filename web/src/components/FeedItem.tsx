@@ -6,6 +6,13 @@ type FeedItemProps = {
   onSelect?: () => void;
 };
 
+function Snapshot({ src }: { src: string | null }) {
+  if (!src) return <SnapshotPlaceholder />;
+  return (
+    <img src={src} alt="Знімок події" className="h-12 w-[72px] shrink-0 rounded-xs bg-surface-3 object-cover" />
+  );
+}
+
 function SnapshotPlaceholder() {
   return (
     <span className="relative h-12 w-[72px] shrink-0 overflow-hidden rounded-xs bg-surface-3">
@@ -21,7 +28,7 @@ function SnapshotPlaceholder() {
 export function FeedItem({ item, onSelect }: FeedItemProps) {
   const style = EVENT_STYLE[item.kind];
   const isStranger = item.kind === "stranger";
-  const hasAi = isStranger && !item.aiLoading && !!item.ai;
+  const hasAi = !item.aiLoading && !!item.ai;
   const container = item.isNew
     ? `${style.tint} ${style.box}`
     : item.selected
@@ -58,14 +65,14 @@ export function FeedItem({ item, onSelect }: FeedItemProps) {
           </span>
         )}
 
-        {isStranger && (item.aiLoading || hasAi) && (
+        {(item.snapshot || (isStranger && (item.aiLoading || hasAi))) && (
           <span className="flex items-start gap-2.5">
-            <SnapshotPlaceholder />
+            <Snapshot src={item.snapshot} />
             {item.aiLoading && (
               <span className="flex flex-1 flex-col gap-1.5 pt-0.5">
                 <span className="block h-2 w-[92%] rounded-xs bg-border" />
                 <span className="block h-2 w-[70%] rounded-xs bg-border" />
-                <span className="text-caption text-text-muted">Аналізую сцену…</span>
+                <span className="text-caption text-text-muted">Опис формується…</span>
               </span>
             )}
             {hasAi && <span className="line-clamp-3 flex-1 text-caption text-text">{item.ai}</span>}

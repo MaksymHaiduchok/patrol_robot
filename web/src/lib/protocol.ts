@@ -31,7 +31,7 @@ export type EventsPage = {
 };
 
 export type ReviewEventRequest = {
-  status: ReviewStatus;
+  status: ReviewStatus | null;
   person_id: string | null;
 };
 
@@ -70,7 +70,7 @@ export type SteerDirection = 'left' | 'right' | 'center';
 
 export type HubStatus = 'online' | 'offline';
 
-export type HomeState = 'none' | 'recording' | 'returning';
+export type HomeState = 'none' | 'recording' | 'returning' | 'patrolling';
 
 export type RobotCommand =
   | { type: 'command'; cmd: 'move'; dir: RobotDirection; speed: number }
@@ -114,6 +114,9 @@ export type RobotStatus = {
 export type OperatorServerMessage =
   | { type: 'event_created'; event: EventRecord }
   | { type: 'event_updated'; event: EventRecord }
-  | { type: 'robot_status'; robot: RobotStatus };
+  | { type: 'robot_status'; robot: RobotStatus }
+  | { type: 'system_mode'; mode: SystemMode };
 
-export type OperatorClientMessage = { type: 'control'; command: RobotCommand };
+export type OperatorClientMessage =
+  | { type: 'control'; command: RobotCommand }
+  | { type: 'set_mode'; mode: SystemMode };

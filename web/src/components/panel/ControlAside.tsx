@@ -76,6 +76,8 @@ const HOME_HINTS: Record<HomeState, string> = {
   none: "Зафіксуйте точку — машинка почне записувати шлях і зможе сама повернутися сюди.",
   recording: "Шлях записується. «Додому» поверне машинку тим самим шляхом у зворотному напрямку.",
   returning: "Машинка повертається додому. Стрілка або «Стоп» перерве повернення.",
+  patrolling:
+    "Машинка патрулює записаним маршрутом туди-назад. «Додому» завершить патруль і поверне її до точки дому.",
 };
 
 type HomeControlsProps = {
@@ -100,7 +102,7 @@ function HomeControls({ home, disabled, onSetHome, onControl }: HomeControlsProp
         <Button
           variant="primary"
           icon={<House aria-hidden className="size-4" />}
-          disabled={disabled || home !== "recording"}
+          disabled={disabled || (home !== "recording" && home !== "patrolling")}
           loading={home === "returning"}
           loadingText="Їде додому"
           onClick={() => onControl({ type: "command", cmd: "return_home" })}
@@ -305,8 +307,10 @@ export function ControlAside({
           />
           <span className="text-small text-text-muted">
             {manual
-              ? "Керуєте ви. Датчика перешкод на машинці немає — стежте за відео."
-              : "Робот чекає на місці й реагує на людей у кадрі. Сам по території не їздить."}
+              ? "Керуєте ви. Датчика перешкод на машинці немає — стежте за відео. Щоб задати маршрут патруля: «Зафіксувати» дім, проїдьте маршрут і перемкніть на «Авто»."
+              : robot.home === "patrolling"
+                ? "Машинка їздить записаним маршрутом між домом і кінцем маршруту, зупиняється, коли бачить людину."
+                : "Маршруту немає: робот стоїть і реагує на людей у кадрі. Щоб патрулював — у «Ручне» зафіксуйте дім, проїдьте маршрут і поверніться в «Авто»."}
           </span>
         </div>
       )}

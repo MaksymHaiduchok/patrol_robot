@@ -1,4 +1,5 @@
 import { EVENT_STYLE, type EventType as EventKind } from "../../tailwind.patrol-preset";
+import { snapshotUrl } from "@/lib/api";
 import { eventTitle, formatTime, reviewLabel } from "@/lib/eventLabels";
 import type { EventRecord, EventType } from "@/lib/protocol";
 
@@ -12,9 +13,10 @@ const KIND_BY_TYPE: Record<EventType, EventKind> = {
   person_left: "left",
 };
 
-export const LEGEND_KINDS: EventKind[] = ["person", "own", "stranger", "left", "unknown"];
+export const LEGEND_KINDS: EventKind[] = ["person", "own", "stranger", "left"];
 
 const NEW_EVENT_MS = 10_000;
+const DESCRIPTION_WAIT_MS = 30_000;
 
 export type FeedItemView = {
   id: string;
@@ -25,6 +27,7 @@ export type FeedItemView = {
   verdict: string | null;
   ai: string | null;
   aiLoading: boolean;
+  snapshot: string | null;
   isNew: boolean;
   selected: boolean;
   needsReview: boolean;
@@ -32,6 +35,14 @@ export type FeedItemView = {
 
 export function eventKind(event: EventRecord): EventKind {
   return KIND_BY_TYPE[event.type];
+}
+
+export function descriptionPending(event: EventRecord, now: number): boolean {
+  return (
+    event.type === "stranger_detected" &&
+    !event.description &&
+    now - new Date(event.created_at).getTime() < DESCRIPTION_WAIT_MS
+  );
 }
 
 export function toFeedItem(
@@ -42,7 +53,7 @@ export function toFeedItem(
 ): FeedItemView {
   const kind = eventKind(event);
   const verdict = reviewLabel(event, names);
-  const needsReview = (kind === "stranger" || kind === "unknown") && !verdict;
+  const needsReview = kind === "stranger" && !verdict;
   return {
     id: event.id,
     kind,
@@ -51,8 +62,8 @@ export function toFeedItem(
     conf: event.confidence === null ? "" : `${Math.round(event.confidence * 100)}%`,
     verdict,
     ai: event.description,
-    // TODO: показувати «Аналізую сцену…», поки Claude генерує опис (етап 6).
-    aiLoading: false,
+    aiLoading: descriptionPending(event, now),
+    snapshot: snapshotUrl(event),
     isNew: needsReview && now - new Date(event.created_at).getTime() < NEW_EVENT_MS,
     selected: event.id === selectedId,
     needsReview,

@@ -50,6 +50,24 @@ export class VisionService {
     return this.post<CaptureResponse>('/faces/capture');
   }
 
+  async snapshot(ts?: number): Promise<Buffer | null> {
+    const query = ts === undefined ? '' : `?ts=${ts}`;
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}/snapshot${query}`, {
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch (error) {
+      this.logger.warn(`vision /snapshot unavailable: ${String(error)}`);
+      return null;
+    }
+    if (!response.ok) {
+      this.logger.warn(`vision /snapshot returned ${response.status}`);
+      return null;
+    }
+    return Buffer.from(await response.arrayBuffer());
+  }
+
   async reload(): Promise<void> {
     try {
       await this.post('/faces/reload');

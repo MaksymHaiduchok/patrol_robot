@@ -7,6 +7,7 @@ import {
 } from '@nestjs/websockets';
 import { WebSocket, type RawData, type Server } from 'ws';
 import type { OperatorServerMessage } from '../protocol/protocol.js';
+import { DecisionService } from '../decision/decision.service.js';
 import { RobotGateway } from '../robot/robot.gateway.js';
 import { decodeMessage } from '../robot/robot.validation.js';
 import { parseOperatorMessage } from './operator.validation.js';
@@ -21,11 +22,17 @@ export class OperatorGateway
   @WebSocketServer()
   private readonly server: Server;
 
-  constructor(private readonly robotGateway: RobotGateway) {}
+  constructor(
+    private readonly robotGateway: RobotGateway,
+    private readonly decision: DecisionService,
+  ) {}
 
   onModuleInit(): void {
     this.robotGateway.onStatus((robot) =>
       this.broadcast({ type: 'robot_status', robot }),
+    );
+    this.decision.onModeChange((mode) =>
+      this.broadcast({ type: 'system_mode', mode }),
     );
   }
 
@@ -35,6 +42,10 @@ export class OperatorGateway
     this.sendTo(client, {
       type: 'robot_status',
       robot: this.robotGateway.currentStatus,
+    });
+    this.sendTo(client, {
+      type: 'system_mode',
+      mode: this.decision.systemMode,
     });
   }
 
@@ -68,7 +79,16 @@ export class OperatorGateway
       this.logger.warn(`invalid message from operator: ${text}`);
       return;
     }
+    if (message.type === 'set_mode') {
+      this.decision.setMode(message.mode);
+      return;
+    }
     const { command } = message;
+    if (this.decision.systemMode === 'STATIONARY' && command.cmd !== 'stop') {
+      this.logger.warn(`command ${command.cmd} ignored: STATIONARY mode`);
+      return;
+    }
+    this.decision.onOperatorControl();
     if (
       command.cmd === 'move' ||
       command.cmd === 'turn' ||

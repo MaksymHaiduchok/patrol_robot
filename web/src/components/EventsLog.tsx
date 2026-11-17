@@ -2,14 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
-import { fetchEvents } from "@/lib/api";
+import { fetchEvents, snapshotUrl } from "@/lib/api";
 import { EVENT_LABELS, eventTitle, formatDateTime, reviewLabel } from "@/lib/eventLabels";
-import type { EventsPage, SystemMode } from "@/lib/protocol";
+import type { EventRecord, EventsPage, SystemMode } from "@/lib/protocol";
 import { usePersons } from "@/lib/usePersons";
 import { useVisionHealth } from "@/lib/useVisionHealth";
 
 const PAGE_SIZE = 25;
 const MODE_LABELS: Record<SystemMode, string> = { PATROL: "Патруль", STATIONARY: "Стаціонар" };
+
+function EventMedia({ event }: { event: EventRecord }) {
+  const snapshot = snapshotUrl(event);
+  if (!snapshot && !event.description) return <span className="text-text-muted">—</span>;
+  return (
+    <span className="flex min-w-[260px] items-start gap-2.5">
+      {snapshot && (
+        <a href={snapshot} target="_blank" rel="noreferrer" className="shrink-0">
+          <img src={snapshot} alt="Знімок події" className="h-14 w-[84px] rounded-xs bg-surface-3 object-cover" />
+        </a>
+      )}
+      {event.description && <span className="text-caption text-text">{event.description}</span>}
+    </span>
+  );
+}
 
 export function EventsLog() {
   const health = useVisionHealth();
@@ -53,6 +68,7 @@ export function EventsLog() {
               <tr>
                 <th className="px-4 py-3 font-semibold">Час</th>
                 <th className="px-4 py-3 font-semibold">Подія</th>
+                <th className="px-4 py-3 font-semibold">Знімок і опис</th>
                 <th className="px-4 py-3 font-semibold">Впевненість</th>
                 <th className="px-4 py-3 font-semibold">Оцінка оператора</th>
                 <th className="px-4 py-3 font-semibold">Режим</th>
@@ -68,6 +84,9 @@ export function EventsLog() {
                       {eventTitle(event, names)}
                     </span>
                   </td>
+                  <td className="px-4 py-3">
+                    <EventMedia event={event} />
+                  </td>
                   <td className="px-4 py-3 text-text-muted">
                     {event.confidence !== null ? `${Math.round(event.confidence * 100)}%` : "—"}
                   </td>
@@ -77,7 +96,7 @@ export function EventsLog() {
               ))}
               {data?.items.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-text-muted">
+                  <td colSpan={6} className="px-4 py-8 text-center text-text-muted">
                     Подій поки немає
                   </td>
                 </tr>

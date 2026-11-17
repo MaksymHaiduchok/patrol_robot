@@ -1,26 +1,32 @@
 import { Car } from "./car.js";
 import { loadConfig } from "./config.js";
 import { hideSteps } from "./hide.js";
-import { returnHome } from "./home.js";
+import { pathLength, returnHome } from "./home.js";
 import { log, sleep } from "./log.js";
 import { PathRecorder, type PathPoint } from "./path.js";
 import type { ApiToRobotMessage, HomeState, RobotCommand, RobotState, RobotToApiMessage } from "./protocol.js";
 
 const RECONNECT_DELAY_MS = 2000;
 const PATH_SAMPLE_MS = 20;
+const MIN_ROUTE_DEGREES = 90;
 
 const config = loadConfig();
 const car = new Car(config);
 const recorder = new PathRecorder();
 
 let socket: WebSocket | null = null;
-let state: RobotState = "IDLE";
+let state: RobotState = "PATROL";
 let stateBeforeAlert: RobotState = "PATROL";
 let lastPingAt = Date.now();
 let watchdogTripped = false;
 let maneuverRun = 0;
 let homeVersion = 0;
 let returning = false;
+let route: PathPoint[] | null = null;
+let towardHome = true;
+let legPath: PathPoint[] | null = null;
+let patrolTask: Promise<void> | null = null;
+let patrolRestart = false;
 
 car.onDisconnect(() => {
   if (recorder.hasHome) {
@@ -28,6 +34,8 @@ car.onDisconnect(() => {
   }
   homeVersion += 1;
   recorder.clear();
+  route = null;
+  legPath = null;
 });
 
 const currentPoint = (): PathPoint => ({ odometer: car.driveDegrees(), steerAngle: car.steerAngle() ?? 0 });
@@ -38,7 +46,8 @@ const recordPath = (): void => {
   }
 };
 
-const homeState = (): HomeState => (returning ? "returning" : recorder.hasHome ? "recording" : "none");
+const homeState = (): HomeState =>
+  returning ? "returning" : route ? "patrolling" : recorder.hasHome ? "recording" : "none";
 
 const send = (message: RobotToApiMessage): void => {
   if (socket?.readyState === WebSocket.OPEN) {
@@ -59,6 +68,7 @@ const setState = (next: RobotState): void => {
 
 const halt = (): void => {
   maneuverRun += 1;
+  patrolRestart = false;
   car.stop();
 };
 
@@ -83,9 +93,97 @@ const hide = async (): Promise<void> => {
   }
 };
 
+const legStart = (points: PathPoint[]): PathPoint[] =>
+  towardHome ? [...points, currentPoint()] : [...[...points].reverse(), currentPoint()];
+
+const pathFromHome = (points: PathPoint[]): PathPoint[] => {
+  if (towardHome) {
+    return legPath ?? [...points, currentPoint()];
+  }
+  const unvisited = legPath ? legPath.length - 1 : points.length;
+  return [...points.slice(0, Math.max(1, points.length - unvisited)), currentPoint()];
+};
+
+const patrol = async (points: PathPoint[]): Promise<void> => {
+  const run = ++maneuverRun;
+  const version = homeVersion;
+  log("Патруль: їду маршрутом між домом і кінцем маршруту");
+  while (run === maneuverRun && version === homeVersion && route === points) {
+    const path = legPath ?? legStart(points);
+    const label = towardHome ? "patrol → дім" : "patrol → кінець маршруту";
+    const result = await returnHome(car, config, path, () => run !== maneuverRun, label);
+    if (version !== homeVersion || route !== points) {
+      return;
+    }
+    if (result.reason === "home") {
+      towardHome = !towardHome;
+      legPath = null;
+      continue;
+    }
+    legPath = result.remaining;
+    if (result.reason === "stalled") {
+      car.stop();
+      stateBeforeAlert = "PATROL";
+      setState("ALERT");
+      log("Патруль: колеса не крутяться (застряг?), зупинено в ALERT; «resume» продовжить");
+    } else {
+      log("Патруль: призупинено");
+    }
+    return;
+  }
+};
+
+const startPatrol = (): void => {
+  if (patrolTask) {
+    patrolRestart = true;
+    return;
+  }
+  if (state !== "PATROL" || car.status === "offline" || returning) {
+    return;
+  }
+  if (!route) {
+    if (!recorder.hasHome) {
+      return;
+    }
+    const points = recorder.take(currentPoint());
+    if (pathLength(points) < MIN_ROUTE_DEGREES) {
+      recorder.resume(points);
+      log(`Патруль: маршрут коротший за ${MIN_ROUTE_DEGREES}° коліс — проїдьте його вручну від дому`);
+      return;
+    }
+    route = points;
+    towardHome = true;
+    legPath = null;
+    log(`Патруль: маршрут ${Math.round(pathLength(points))}° коліс, ${points.length} точок`);
+  }
+  const points = route;
+  patrolTask = patrol(points).finally(() => {
+    patrolTask = null;
+    if (patrolRestart) {
+      patrolRestart = false;
+      startPatrol();
+    }
+  });
+};
+
+const endPatrol = async (): Promise<void> => {
+  maneuverRun += 1;
+  patrolRestart = false;
+  await patrolTask;
+  if (!route) {
+    return;
+  }
+  recorder.resume(pathFromHome(route));
+  route = null;
+  legPath = null;
+  log("Патруль: завершено, шлях від дому записується далі");
+};
+
 const setHome = (): void => {
   maneuverRun += 1;
   homeVersion += 1;
+  route = null;
+  legPath = null;
   car.brakeDrive();
   recorder.begin(currentPoint());
   log("Дім: точку зафіксовано, записую шлях");
@@ -96,7 +194,7 @@ const goHome = async (): Promise<void> => {
   const version = homeVersion;
   returning = true;
   const path = recorder.take(currentPoint());
-  const result = await returnHome(car, config, path, () => run !== maneuverRun);
+  const result = await returnHome(car, config, path, () => run !== maneuverRun, "return_home");
   returning = false;
   if (version !== homeVersion) {
     return;
@@ -145,10 +243,15 @@ const handleCommand = (command: RobotCommand): void => {
       log("servo не підтримується: на платформі немає поворотної голови");
       return;
     case "set_state":
-      if (command.state === "IDLE" || command.state === "ALERT") {
+      if (command.state !== "PATROL") {
         halt();
       }
       setState(command.state);
+      if (command.state === "PATROL") {
+        startPatrol();
+      } else if (command.state !== "ALERT") {
+        void endPatrol();
+      }
       break;
     case "alert":
       halt();
@@ -159,6 +262,7 @@ const handleCommand = (command: RobotCommand): void => {
       break;
     case "resume":
       setState(stateBeforeAlert);
+      startPatrol();
       break;
     case "hide":
       void hide();
@@ -175,7 +279,7 @@ const handleCommand = (command: RobotCommand): void => {
         log("Додому: уже повертаюсь");
         return;
       }
-      void goHome();
+      void endPatrol().then(goHome);
       break;
   }
   ack(command.cmd);
@@ -195,6 +299,7 @@ const handleMessage = (raw: string): void => {
     if (watchdogTripped) {
       watchdogTripped = false;
       log("Watchdog: ping від api відновився");
+      startPatrol();
     }
     send({ type: "pong", ts: message.ts });
     return;

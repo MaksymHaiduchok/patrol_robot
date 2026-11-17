@@ -29,9 +29,18 @@ cd web && pnpm install && pnpm dev
 cd robot-bridge && pnpm install && pnpm start
 ```
 
+Перший запуск:
+
+1. Supabase: застосувати всі міграції з `api/supabase/migrations/` по порядку (SQL Editor, див. [api/README.md](api/README.md)).
+2. `api/.env`: ключі Supabase, `ANTHROPIC_API_KEY` (для описів чужих; без ключа все інше працює).
+3. Телефон: IP Webcam → `vision/.env` `PHONE_STREAM_URL=http://<PHONE_IP>:8080/video`.
+4. LEGO: увімкнути хаб, `cd robot-bridge && pnpm probe` — перевірити, що мотори на A, B, D.
+
 Для `robot-bridge` хаб має бути увімкнений, а передні колеса виставлені прямо. Порти хаба перевіряє `pnpm probe`. Папка `robot/` (Raspberry Pi + Freenove) — відкинутий варіант, див. [docs/decisions.md](docs/decisions.md).
 
 Перевірка: http://localhost:8001/health, http://localhost:4000, http://localhost:3000.
+
+Сценарій демо: «Ручне» → «Зафіксувати» дім → проїхати маршрут стрілками → «Авто» — машинка їздить маршрутом туди-назад, зупиняється, коли в кадрі людина, їде далі, якщо це «свій» або через 30 с після того, як людина пішла; чужого фотографує, і Claude описує сцену. «Стаціонар» — телефон знятий, система лише спостерігає.
 
 ## Документація
 

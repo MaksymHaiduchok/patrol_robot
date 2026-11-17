@@ -3,10 +3,12 @@
 import { Camera, Check, Info, Plus, RotateCw, Search, TriangleAlert, X } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { ApiError, captureFace, createPerson, describeFaceError, reviewEvent } from "@/lib/api";
+import { ApiError, captureFace, createPerson, describeFaceError, reviewEvent, snapshotUrl } from "@/lib/api";
 import { VISION_STREAM_URL } from "@/lib/config";
 import { formatTime } from "@/lib/eventLabels";
+import { descriptionPending } from "@/lib/eventView";
 import type { EventRecord, PersonSummary } from "@/lib/protocol";
+import { useNow } from "@/lib/useNow";
 
 type Step = "ask" | "choose" | "new" | "error" | "done";
 
@@ -91,6 +93,9 @@ export function IdentifyModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<CaptureError | null>(null);
   const [reviewed, setReviewed] = useState<EventRecord | null>(null);
+  const now = useNow();
+  const snapshot = snapshotUrl(event);
+  const describing = now !== null && descriptionPending(event, now);
 
   useEffect(() => {
     const onKeyDown = (keyEvent: KeyboardEvent) => {
@@ -218,8 +223,11 @@ export function IdentifyModal({
           </span>
         </MediaTile>
         <MediaTile caption="Знімок моменту події">
-          {/* TODO: показувати знімок зі Storage (snapshot_path), коли з'являться знімки подій (етап 6). */}
-          <SnapshotPlaceholder />
+          {snapshot ? (
+            <img src={snapshot} alt="Знімок моменту події" className="h-full w-full object-contain" />
+          ) : (
+            <SnapshotPlaceholder />
+          )}
         </MediaTile>
       </div>
 
@@ -244,6 +252,9 @@ export function IdentifyModal({
               <div className="rounded-md bg-surface-2 px-3 py-2.5 text-small text-text">
                 <span className="font-semibold text-accent-text">Опис ШІ.</span> {event.description}
               </div>
+            )}
+            {!event.description && describing && (
+              <div className="rounded-md bg-surface-2 px-3 py-2.5 text-small text-text-muted">Опис формується…</div>
             )}
             <div className="grid grid-cols-2 gap-2.5">
               <Button variant="primary" size="lg" disabled={busy} onClick={() => setStep("choose")}>

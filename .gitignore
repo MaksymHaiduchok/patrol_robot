@@ -21,3 +21,4 @@ vision/models/
 *.onnx
 
 vision/faces_demo/
+vision/logs/

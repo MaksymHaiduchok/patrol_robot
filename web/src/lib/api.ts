@@ -41,6 +41,10 @@ export function fetchEvents(limit: number, offset: number): Promise<EventsPage> 
   return request(`/events?limit=${limit}&offset=${offset}`);
 }
 
+export function snapshotUrl(event: EventRecord): string | null {
+  return event.snapshot_path ? `${API_URL}/events/${event.id}/snapshot` : null;
+}
+
 export function reviewEvent(id: string, body: ReviewEventRequest): Promise<EventRecord> {
   return request(`/events/${id}/review`, json("PATCH", body));
 }

@@ -143,13 +143,29 @@ const followRun = async (
   return { reached: reason === "done" ? run.to : reached, reason };
 };
 
+export const pathLength = (path: PathPoint[]): number =>
+  path.reduce((sum, point, index) => (index === 0 ? sum : sum + Math.abs(point.odometer - path[index - 1].odometer)), 0);
+
+const withCm = (degrees: number, config: Config): string => {
+  const rounded = `${Math.round(degrees)}°`;
+  if (config.wheelDiameterMm <= 0) {
+    return rounded;
+  }
+  const cm = (degrees / 360) * Math.PI * (config.wheelDiameterMm / 10);
+  return `${rounded} (${cm.toFixed(1)} cm)`;
+};
+
 export const returnHome = async (
   car: Car,
   config: Config,
   path: PathPoint[],
   isCancelled: () => boolean,
+  label: string,
 ): Promise<ReturnResult> => {
-  log(`Додому: записано ${path.length} точок шляху`);
+  const startedAt = Date.now();
+  const length = pathLength(path);
+  let runs = 0;
+  log(`${label}: ${path.length} точок шляху, ${withCm(length, config)} коліс`);
   let index = path.length - 1;
 
   while (true) {
@@ -158,7 +174,8 @@ export const returnHome = async (
       break;
     }
     const distance = Math.round(path[run.to].odometer - car.driveDegrees());
-    log(`Додому: ${run.direction > 0 ? "вперед" : "назад"} ${Math.abs(distance)}° коліс (точки ${run.from}→${run.to})`);
+    runs += 1;
+    log(`${label}: ${run.direction > 0 ? "вперед" : "назад"} ${Math.abs(distance)}° коліс (точки ${run.from}→${run.to})`);
     const { reached, reason } = await followRun(car, config, path, run, isCancelled);
     if (reason !== "done") {
       const current = { odometer: car.driveDegrees(), steerAngle: car.steerAngle() ?? 0 };
@@ -166,11 +183,15 @@ export const returnHome = async (
     }
     const error = Math.round(car.driveDegrees() - path[run.to].odometer);
     if (error !== 0) {
-      log(`Додому: кінець прогону з похибкою ${error}°`);
+      log(`${label}: кінець прогону з похибкою ${error}°`);
     }
     index = run.to;
   }
 
   car.steerTo(0);
+  const finalError = car.driveDegrees() - path[0].odometer;
+  log(
+    `${label} done: path length ${withCm(length, config)} wheel, runs ${runs}, final error ${withCm(finalError, config)}, ${Date.now() - startedAt} ms`,
+  );
   return { remaining: [{ odometer: car.driveDegrees(), steerAngle: 0 }], reason: "home" };
 };

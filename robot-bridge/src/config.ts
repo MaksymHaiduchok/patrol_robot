@@ -12,6 +12,7 @@ export type Config = {
   steerCalibrationPower: number;
   watchdogSeconds: number;
   telemetryIntervalMs: number;
+  wheelDiameterMm: number;
   hide: {
     backSpeed: number;
     backMs: number;
@@ -83,7 +84,7 @@ const readSinglePort = (name: string, fallback: string): string => {
   return ports[0];
 };
 
-const readSide =(name: string, fallback: SteerSide): SteerSide => {
+const readSide = (name: string, fallback: SteerSide): SteerSide => {
   const value = readString(name, fallback);
   if (value !== "left" && value !== "right") {
     throw new Error(`Змінна ${name} має бути left або right, отримано "${value}"`);
@@ -103,6 +104,7 @@ export const loadConfig = (): Config => ({
   steerCalibrationPower: readNumber("STEER_CALIBRATION_POWER", 40),
   watchdogSeconds: readNumber("WATCHDOG_SECONDS", 2),
   telemetryIntervalMs: readNumber("TELEMETRY_INTERVAL_MS", 300),
+  wheelDiameterMm: readNumber("WHEEL_DIAMETER_MM", 0),
   hide: {
     backSpeed: readNumber("HIDE_BACK_SPEED", 50),
     backMs: readNumber("HIDE_BACK_MS", 1500),

@@ -34,7 +34,7 @@ class Detection:
     face: FaceMatch
 
 
-DetectionListener = Callable[[list[Detection], float], None]
+DetectionListener = Callable[[list[Detection], float, int, np.ndarray], None]
 
 
 class FrameSource(Protocol):
@@ -162,7 +162,7 @@ class PersonDetector:
                 self._timestamps.append(time.monotonic())
 
             if self._listener is not None:
-                self._listener(detections, time.monotonic())
+                self._listener(detections, time.monotonic(), frame_id, frame)
 
             summary = describe(detections)
             if summary != last_summary:

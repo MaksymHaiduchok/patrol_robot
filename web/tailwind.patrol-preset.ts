@@ -61,14 +61,13 @@ const patrolPreset: Partial<Config> = {
 export default patrolPreset;
 
 // Мапа типу події → класи (використовувати в FeedItem, EventsTable, VideoLegend)
-export type EventType = "person" | "own" | "stranger" | "left" | "unknown";
+export type EventType = "person" | "own" | "stranger" | "left";
 
 export const EVENT_STYLE: Record<EventType, { label: string; dot: string; text: string; tint: string; box: string; onBox: string }> = {
   person:   { label: "Людина в кадрі",       dot: "bg-ev-person",   text: "text-ok-text",     tint: "bg-ev-person/10",   box: "border-ev-person",   onBox: "text-bg" },
   own:      { label: "Свій",                 dot: "bg-ev-own",      text: "text-[#93a8ff]",   tint: "bg-ev-own/10",      box: "border-ev-own",      onBox: "text-bg" },
   stranger: { label: "Чужий",                dot: "bg-ev-stranger", text: "text-danger-text", tint: "bg-ev-stranger/15", box: "border-ev-stranger", onBox: "text-white" },
   left:     { label: "Людина пішла",         dot: "bg-ev-left",     text: "text-[#b8b8c2]",   tint: "bg-ev-left/10",     box: "border-ev-left",     onBox: "text-bg" },
-  unknown:  { label: "Особу не встановлено", dot: "bg-ev-unknown",  text: "text-warn-text",   tint: "bg-ev-unknown/10",  box: "border-ev-unknown",  onBox: "text-bg" },
 };
 
 // Поріг відстані до перешкоди

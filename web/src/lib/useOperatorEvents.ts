@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchEvents } from "@/lib/api";
 import { API_WS_URL } from "@/lib/config";
-import type { EventRecord, OperatorClientMessage, OperatorServerMessage, RobotCommand } from "@/lib/protocol";
+import type {
+  EventRecord,
+  OperatorClientMessage,
+  OperatorServerMessage,
+  RobotCommand,
+  SystemMode,
+} from "@/lib/protocol";
 import { ROBOT_OFFLINE, type RobotStatus, toRobotStatus } from "@/lib/robot";
 
 const FEED_SIZE = 50;
@@ -15,7 +21,9 @@ type OperatorEvents = {
   apiDown: boolean;
   pendingReview: EventRecord[];
   robot: RobotStatus;
+  systemMode: SystemMode;
   sendControl: (command: RobotCommand) => void;
+  setSystemMode: (mode: SystemMode) => void;
   applyUpdate: (event: EventRecord) => void;
   dismissReview: (id: string) => void;
   reopenReview: (event: EventRecord) => void;
@@ -32,20 +40,26 @@ export function useOperatorEvents(): OperatorEvents {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [pendingReview, setPendingReview] = useState<EventRecord[]>([]);
   const [robot, setRobot] = useState<RobotStatus>(ROBOT_OFFLINE);
+  const [systemMode, setMode] = useState<SystemMode>("PATROL");
   const socketRef = useRef<WebSocket | null>(null);
 
-  const sendControl = useCallback((command: RobotCommand) => {
+  const send = useCallback((message: OperatorClientMessage) => {
     const socket = socketRef.current;
     if (socket?.readyState !== WebSocket.OPEN) return;
-    const message: OperatorClientMessage = { type: "control", command };
     socket.send(JSON.stringify(message));
   }, []);
 
+  const sendControl = useCallback((command: RobotCommand) => send({ type: "control", command }), [send]);
+
+  const setSystemMode = useCallback((mode: SystemMode) => send({ type: "set_mode", mode }), [send]);
+
   const applyUpdate = useCallback((event: EventRecord) => {
     setEvents((current) => upsert(current, event));
-    if (event.review_status) {
-      setPendingReview((current) => current.filter((item) => item.id !== event.id));
-    }
+    setPendingReview((current) =>
+      event.review_status
+        ? current.filter((item) => item.id !== event.id)
+        : current.map((item) => (item.id === event.id ? event : item)),
+    );
   }, []);
 
   const dismissReview = useCallback((id: string) => {
@@ -90,6 +104,10 @@ export function useOperatorEvents(): OperatorEvents {
           setRobot(toRobotStatus(data.robot));
           return;
         }
+        if (data.type === "system_mode") {
+          setMode(data.mode);
+          return;
+        }
         applyUpdate(data.event);
         if (data.type === "event_created" && data.event.type === "stranger_detected") {
           setPendingReview((current) => [...current, data.event]);
@@ -112,7 +130,9 @@ export function useOperatorEvents(): OperatorEvents {
     apiDown: connected === false,
     pendingReview,
     robot,
+    systemMode,
     sendControl,
+    setSystemMode,
     applyUpdate,
     dismissReview,
     reopenReview,

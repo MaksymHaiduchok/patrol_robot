@@ -8,7 +8,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'warn', 'error'],
   });
-  app.enableCors();
+  app.enableCors({
+    origin: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(','),
+  });
   app.useWebSocketAdapter(new WsAdapter(app));
   await app.listen(process.env.PORT ?? 4000);
 }

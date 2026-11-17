@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { VISION_STREAM_URL } from "@/lib/config";
 
 export type AlarmInfo = {
-  time: string;
+  time: string | null;
   secondsAgo: number;
   who: string;
 };
@@ -59,7 +59,12 @@ function AlarmBanner({ alarm, onResume }: { alarm: AlarmInfo; onResume: () => vo
       <div className="flex min-w-[200px] flex-1 flex-col gap-0.5">
         <span className="text-[17px] font-bold">Робот зупинено: людина в кадрі</span>
         <span className="text-small opacity-90">
-          О <span className="font-mono">{alarm.time}</span> · {alarm.secondsAgo} с тому · {alarm.who}
+          {alarm.time && (
+            <>
+              О <span className="font-mono">{alarm.time}</span> · {alarm.secondsAgo} с тому ·{" "}
+            </>
+          )}
+          {alarm.who}
         </span>
       </div>
       <button

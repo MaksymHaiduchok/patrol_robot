@@ -6,7 +6,7 @@ export type SteerDirection = "left" | "right" | "center";
 
 export type HubStatus = "online" | "offline";
 
-export type HomeState = "none" | "recording" | "returning";
+export type HomeState = "none" | "recording" | "returning" | "patrolling";
 
 export type RobotCommand =
   | { type: "command"; cmd: "move"; dir: Direction; speed: number }

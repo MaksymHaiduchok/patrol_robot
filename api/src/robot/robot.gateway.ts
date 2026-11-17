@@ -9,6 +9,7 @@ import { WebSocket, type RawData } from 'ws';
 import type {
   ApiToRobotMessage,
   RobotCommand,
+  RobotState,
   RobotStatus,
 } from '../protocol/protocol.js';
 import { decodeMessage, parseRobotMessage } from './robot.validation.js';
@@ -40,6 +41,7 @@ export class RobotGateway
   private socket: WebSocket | null = null;
   private status: RobotStatus = OFFLINE_STATUS;
   private pingTimer: ReturnType<typeof setInterval> | undefined;
+  private requestedState: RobotState | null = null;
 
   get currentStatus(): RobotStatus {
     return this.status;
@@ -84,6 +86,9 @@ export class RobotGateway
       this.logger.warn(`command ${command.cmd} dropped: robot not connected`);
       return false;
     }
+    if (command.cmd === 'set_state') {
+      this.requestedState = command.state;
+    }
     this.logger.log(`→ robot ${JSON.stringify(command)}`);
     this.send(command);
     return true;
@@ -111,6 +116,13 @@ export class RobotGateway
           robot_id: message.robot_id,
           connected: true,
         });
+        if (this.requestedState) {
+          this.sendCommand({
+            type: 'command',
+            cmd: 'set_state',
+            state: this.requestedState,
+          });
+        }
         break;
       case 'telemetry':
         this.updateStatus({

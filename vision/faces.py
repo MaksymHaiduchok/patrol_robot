@@ -34,6 +34,7 @@ class FaceMatch:
     person_id: str | None
     name: str | None
     score: float
+    best_name: str | None = None
 
 
 NO_FACE = FaceMatch(face_found=False, person_id=None, name=None, score=0.0)
@@ -104,9 +105,19 @@ class FaceRecognizer:
             if score > best_score:
                 best, best_score = face, score
         if best is None or best_score < self.threshold:
-            return FaceMatch(face_found=True, person_id=None, name=None, score=max(best_score, 0.0))
+            return FaceMatch(
+                face_found=True,
+                person_id=None,
+                name=None,
+                score=max(best_score, 0.0),
+                best_name=best.name if best else None,
+            )
         return FaceMatch(
-            face_found=True, person_id=best.person_id, name=best.name, score=best_score
+            face_found=True,
+            person_id=best.person_id,
+            name=best.name,
+            score=best_score,
+            best_name=best.name,
         )
 
 

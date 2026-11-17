@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  Redirect,
 } from '@nestjs/common';
 import type { EventRecord, EventsPage } from '../protocol/protocol.js';
 import { EventsService } from './events.service.js';
@@ -32,6 +33,14 @@ export class EventsController {
   ): Promise<EventsPage> {
     const pagination = parsePagination(limit, offset);
     return this.eventsService.findPage(pagination.limit, pagination.offset);
+  }
+
+  @Get(':id/snapshot')
+  @Redirect()
+  async snapshot(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<{ url: string }> {
+    return { url: await this.eventsService.snapshotUrl(id) };
   }
 
   @Patch(':id/review')

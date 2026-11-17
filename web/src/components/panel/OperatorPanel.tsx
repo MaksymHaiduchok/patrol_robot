@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { reviewEvent } from "@/lib/api";
 import { distanceTone } from "../../../tailwind.patrol-preset";
 import { Header } from "@/components/Header";
 import { IdentifyModal } from "@/components/IdentifyModal";
@@ -76,8 +77,10 @@ function buildCards(
     ? { label: "Стан робота", value: "Тривога", tone: "danger", critical: true }
     : manual
       ? { label: "Стан робота", value: "Ручне", tone: "accent" }
-      : patrol && robot.online
-        ? { label: "Стан робота", value: "Патрулює", tone: "ok" }
+      : patrol && robot.online && robot.state === "PATROL"
+        ? robot.home === "patrolling"
+          ? { label: "Стан робота", value: "Патрулює маршрутом", tone: "ok" }
+          : { label: "Стан робота", value: "Чекає на місці", tone: "ok" }
         : { label: "Стан робота", value: "Очікування", tone: "neutral" };
 
   const distanceLabel = "Відстань до перешкоди";
@@ -99,31 +102,41 @@ function buildCards(
 }
 
 export function OperatorPanel() {
-  const [systemMode, setSystemMode] = useState<SystemMode>("PATROL");
-  const [controlMode, setControlMode] = useState<ControlMode>("AUTO");
-  const [resumedVisitId, setResumedVisitId] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const health = useVisionHealth();
   const now = useNow();
   const { persons, names, refresh: refreshPersons } = usePersons();
-  const { events, connected, apiDown, pendingReview, robot, sendControl, applyUpdate, dismissReview, reopenReview } =
-    useOperatorEvents();
+  const {
+    events,
+    connected,
+    apiDown,
+    pendingReview,
+    robot,
+    systemMode,
+    sendControl,
+    setSystemMode,
+    applyUpdate,
+    dismissReview,
+    reopenReview,
+  } = useOperatorEvents();
 
   const cameraOnline = health?.source_connected ?? false;
   const fps = health?.fps ?? null;
+  const controlMode: ControlMode = robot.state === "MANUAL" ? "MANUAL" : "AUTO";
   const manual = systemMode === "PATROL" && controlMode === "MANUAL";
   const reviewTarget = pendingReview[0] ?? null;
 
   const visit = useMemo(() => findActiveVisit(events, names), [events, names]);
-  const alarmActive = systemMode === "PATROL" && visit !== null && visit.start.id !== resumedVisitId;
-  const alarm: AlarmInfo | null =
-    alarmActive && visit
+  const alarmActive = systemMode === "PATROL" && robot.online && robot.state === "ALERT";
+  const alarm: AlarmInfo | null = !alarmActive
+    ? null
+    : visit
       ? {
           time: formatTime(visit.start.created_at),
           secondsAgo: now === null ? 0 : Math.max(0, Math.floor((now - Date.parse(visit.start.created_at)) / 1000)),
           who: visit.who,
         }
-      : null;
+      : { time: null, secondsAgo: 0, who: "Тривога без людини в кадрі" };
 
   const feed = useMemo(
     () => events.map((event) => toFeedItem(event, names, now ?? 0, reviewTarget?.id ?? null)),
@@ -132,10 +145,7 @@ export function OperatorPanel() {
   const cards = buildCards(cameraOnline, fps, robot, systemMode, manual, alarmActive);
   const clock = now === null ? "--:--:--" : new Date(now).toLocaleTimeString("uk-UA");
 
-  const resume = () => {
-    setResumedVisitId(visit?.start.id ?? null);
-    sendControl({ type: "command", cmd: "resume" });
-  };
+  const resume = () => sendControl({ type: "command", cmd: "resume" });
   const stop = () => sendControl({ type: "command", cmd: "stop" });
 
   const setHome = () => {
@@ -151,7 +161,6 @@ export function OperatorPanel() {
   };
 
   const changeControlMode = (mode: ControlMode) => {
-    setControlMode(mode);
     sendControl({ type: "command", cmd: "stop" });
     sendControl({ type: "command", cmd: "set_state", state: mode === "MANUAL" ? "MANUAL" : "PATROL" });
   };
@@ -239,8 +248,15 @@ export function OperatorPanel() {
           message={toast.message}
           actionLabel={toast.event ? "Скасувати" : undefined}
           onAction={() => {
-            if (toast.event) reopenReview(toast.event);
+            const target = toast.event;
             setToast(null);
+            if (!target) return;
+            reviewEvent(target.id, { status: null, person_id: null })
+              .then((updated) => {
+                applyUpdate(updated);
+                reopenReview(updated);
+              })
+              .catch(() => setToast({ id: Date.now(), message: "Не вдалося скасувати оцінку", event: null }));
           }}
           onClose={closeToast}
         />

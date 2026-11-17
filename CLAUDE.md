@@ -108,8 +108,11 @@ PORT=4000
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=claude-haiku-5-5
+CLAUDE_ENABLED=true
 VISION_URL=http://localhost:8001
 ALERT_RESUME_TIMEOUT_SECONDS=30
+CORS_ORIGINS=http://localhost:3000
 ```
 
 **web/.env.local**
@@ -183,9 +186,12 @@ HIDE_FORWARD_MS=1500
 2. `known_person` → `resume` роботу (якщо в кадрі немає чужих) → запис події.
 3. `stranger_detected` → робот лишається в `ALERT` → запис події + знімок у Storage → асинхронно `ClaudeService` генерує опис → оновлення події → push оператору.
 4. Якщо `ALERT` триває `ALERT_RESUME_TIMEOUT_SECONDS` без нових подій про людей → `resume`.
-5. Оператор може будь-коли надіслати `resume`, `stop` або перейти в `MANUAL`.
+5. Оператор може будь-коли надіслати `resume`, `stop` або перейти в `MANUAL`. Будь-яка команда оператора знімає «тривогу від системи»: система відпускає робота сама лише тоді, коли сама його зупинила.
+6. На `hello` робота api повторює останній `set_state` від оператора.
 
-У режимі `STATIONARY` команди роботу не надсилаються, лише фіксуються події й сповіщення.
+`onVisionEvent` викликається синхронно до запису в БД; лог `decision <подія> → <команда> in N ms (vision→api M ms)` — для замірів.
+
+У режимі `STATIONARY` команди роботу не надсилаються, лише фіксуються події й сповіщення. Режим тримає `DecisionService`, web змінює його через `set_mode` і отримує `system_mode`.
 
 ### Реєстрація «свого»
 web → `POST /persons` (multipart: name, photos[]) → api зберігає фото в Storage (`faces/`) → для кожного фото викликає `vision POST /faces/embed` → зберігає вектори в `face_embeddings` → викликає `vision POST /faces/reload`.
@@ -261,7 +267,7 @@ api шле `ping` раз на секунду, а телеметрія від р�
 
 ### api ↔ web (`/operator`)
 Від api до web: `event_created`, `event_updated` (з'явився опис Claude), `robot_status` (`connected`, `hub`, `state`, `distance_cm`, `battery`), `system_mode` (`PATROL`/`STATIONARY`).
-Від web до api: `control` (`{ "type": "control", "command": <команда робота> }` — ручне керування, стоп, resume, set_state), `set_mode`.
+Від web до api: `control` (`{ "type": "control", "command": <команда робота> }` — ручне керування, стоп, resume, set_state), `set_mode` (`{ "type": "set_mode", "mode": "STATIONARY" }`).
 
 ## 11. Робот (`robot-bridge/`)
 
@@ -275,7 +281,7 @@ api шле `ping` раз на секунду, а телеметрія від р�
 
 ### Стани
 - `IDLE` — стоїть, чекає команд.
-- `PATROL` — без датчика відстані машина сама не їде; рухається за командами від api.
+- `PATROL` — якщо оператор записав маршрут (дім → проїхати вручну → `PATROL`), машинка їздить ним туди-назад повтором шляху; без маршруту стоїть. Міст стартує в цьому стані.
 - `ALERT` — стоїть на місці.
 - `MANUAL` — лише команди оператора.
 
